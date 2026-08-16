@@ -261,9 +261,10 @@
   "importDialog": {
     "title": "Importieren",
     "tabCsv": "CSV",
-    "bankProfile": "Bankprofil",
-    "bankProfileNone": "Kein / Benutzerdefiniert",
-    "manageBankProfiles": "Profile verwalten",
+    "bankProfile": "Bank",
+    "bankProfileHint": "Bank wählen, um Importeinstellungen automatisch zu befüllen.",
+    "bankProfileNone": "Kein Profil (manuelle Einstellungen)",
+    "manageBankProfiles": "Profile speichern / verwalten",
     "account": "Konto",
     "selectAccount": "Konto auswählen...",
     "delimiter": "Trennzeichen",

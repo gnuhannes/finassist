@@ -11,6 +11,7 @@ from sklearn.svm import LinearSVC  # type: ignore[import-untyped]
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from my_private_finances.config import get_data_dir
 from my_private_finances.models import Category, Transaction
 from my_private_finances.schemas.ml import Suggestion, TrainResult
 
@@ -24,7 +25,7 @@ class ColdStartError(Exception):
 
 
 def _model_path() -> Path:
-    return Path("data/ml_model.joblib")
+    return get_data_dir() / "ml_model.joblib"
 
 
 def _feature_text(tx: Transaction) -> str:

@@ -239,16 +239,21 @@ async def import_transactions_from_csv_path(
             # --- amount ---
             amount_raw = _first_present(row, col["amount"])
             if amount_raw is None:
-                candidates = "/".join(col["amount"])
-                _record_error(
-                    ImportErrorDetail(
-                        row=idx,
-                        field="amount",
-                        message=f"Missing column '{candidates}'",
-                        hint="Add one of these header names to the CSV, or configure a column mapping in your profile.",
+                col_in_header = any(k in row for k in col["amount"])
+                if col_in_header:
+                    # Column header present but cell is empty — informational/pending row, skip silently.
+                    skipped += 1
+                else:
+                    candidates = "/".join(col["amount"])
+                    _record_error(
+                        ImportErrorDetail(
+                            row=idx,
+                            field="amount",
+                            message=f"Missing column '{candidates}'",
+                            hint="Add one of these header names to the CSV, or configure a column mapping in your profile.",
+                        )
                     )
-                )
-                failed += 1
+                    failed += 1
                 continue
             try:
                 amount = _parse_decimal(amount_raw, decimal_comma=decimal_comma)

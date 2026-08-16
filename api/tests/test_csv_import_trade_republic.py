@@ -201,6 +201,44 @@ async def test_tr_column_mapping(
 
 
 @pytest.mark.asyncio
+async def test_tr_missing_amount_silently_skipped(
+    test_app: AsyncClient,
+    tmp_path: Path,
+) -> None:
+    """A row whose amount cell is empty (column present) is silently skipped, not an error."""
+    acc = await create_account(test_app)
+    csv_content = (
+        "\n".join(
+            [
+                _TR_HEADER,
+                # Valid CASH row
+                "2025-09-01T09:39:13.160169Z,2025-09-01,DEFAULT,CASH,CARD_TRANSACTION,,Brown-Block,,,,-5845.30,,,EUR,,,,NUnTTzvZrwjz,7454237a-8e0f-3a53-8680-a09f2dd1ec44,,,,9646",
+                # Informational row — amount column present but empty
+                "2025-09-01T10:00:00.000000Z,2025-09-01,DEFAULT,CASH,INFO,,,,,,,,,,,,,,info-row-id,,,,",
+            ]
+        )
+        + "\n"
+    )
+    csv_file = tmp_path / "tr_missing_amount.csv"
+    csv_file.write_text(csv_content, encoding="utf-8")
+
+    session_factory = test_app._transport.app.state.session_factory  # type: ignore[attr-defined]
+    async with session_factory() as session:  # type: ignore[call-arg]
+        res = await import_transactions_from_csv_path(
+            session=session,
+            account_id=acc["id"],
+            csv_path=csv_file,
+            column_map=TR_COLUMN_MAP,
+            row_filters=TR_ROW_FILTERS,
+        )
+
+    assert res.total_rows == 2
+    assert res.created == 1, f"Only the valid cash row should be created, got {res}"
+    assert res.skipped == 1, f"Empty-amount row should be silently skipped, got {res}"
+    assert res.failed == 0, f"Empty-amount row must not be an error, got {res}"
+
+
+@pytest.mark.asyncio
 async def test_tr_idempotent(
     test_app: AsyncClient,
     tmp_path: Path,

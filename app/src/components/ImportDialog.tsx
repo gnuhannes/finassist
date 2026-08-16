@@ -170,6 +170,7 @@ export function ImportDialog({ open, onClose }: Props) {
               {t("importDialog.manageBankProfiles")}
             </button>
           </div>
+          <p className={styles.hint}>{t("importDialog.bankProfileHint")}</p>
 
           {showProfileManager && <CsvProfileManager onClose={() => setShowProfileManager(false)} />}
 

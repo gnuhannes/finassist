@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from my_private_finances.config import get_data_dir
 from my_private_finances.db import (
     DEFAULT_DB_PATH,
     create_engine,
@@ -30,12 +31,13 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Resolve watch root from DB (or use default)
     root_path: Path
+    default_watch = get_data_dir() / "watch"
     try:
         async with session_factory() as session:
             settings = await session.get(WatchSettings, 1)
-            root_path = Path(settings.root_path) if settings else Path("data/watch")
+            root_path = Path(settings.root_path) if settings else default_watch
     except Exception:
-        root_path = Path("data/watch")
+        root_path = default_watch
         logger.warning(
             "Could not read watch settings from DB, using default", exc_info=True
         )

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import select
 from sqlmodel import delete
 
+from my_private_finances.config import get_data_dir
 from my_private_finances.deps import SessionDep
 from my_private_finances.models.watch_folder_config import (
     WatchFolderConfig,
@@ -32,7 +33,9 @@ _SETTINGS_ID = 1
 async def _get_or_create_settings(session: SessionDep) -> WatchSettings:
     settings = await session.get(WatchSettings, _SETTINGS_ID)
     if settings is None:
-        settings = WatchSettings(id=_SETTINGS_ID, root_path="data/watch")
+        settings = WatchSettings(
+            id=_SETTINGS_ID, root_path=str(get_data_dir() / "watch")
+        )
         session.add(settings)
         await session.commit()
         await session.refresh(settings)
