@@ -8,6 +8,7 @@ import pytest
 from httpx import AsyncClient
 
 from my_private_finances.services.csv_import import import_transactions_from_csv_path
+from my_private_finances.services.exceptions import CsvFormatError
 from tests.helpers import create_account
 
 
@@ -41,7 +42,7 @@ async def test_row_count_over_limit_raises_before_any_write(
 
     session_factory = test_app._transport.app.state.session_factory  # type: ignore[attr-defined]
     async with session_factory() as session:
-        with pytest.raises(ValueError, match="row"):
+        with pytest.raises(CsvFormatError, match="row"):
             await import_transactions_from_csv_path(
                 session=session,
                 account_id=acc["id"],

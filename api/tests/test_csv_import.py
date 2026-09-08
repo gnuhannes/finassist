@@ -9,6 +9,7 @@ from my_private_finances.services.csv_import import (
     ColumnMap,
     import_transactions_from_csv_path,
 )
+from my_private_finances.services.exceptions import CsvFormatError, NotFoundError
 from tests.helpers import create_account, create_category, create_rule
 
 
@@ -147,7 +148,7 @@ async def test_csv_import_account_not_found_raises(
 
     session_factory = test_app._transport.app.state.session_factory  # type: ignore[attr-defined]
     async with session_factory() as session:
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(NotFoundError, match="not found"):
             await import_transactions_from_csv_path(
                 session=session,
                 account_id=99999,
@@ -222,7 +223,7 @@ async def test_csv_import_cannot_decode_raises(
 
     session_factory = test_app._transport.app.state.session_factory  # type: ignore[attr-defined]
     async with session_factory() as session:
-        with pytest.raises(ValueError, match="Cannot decode"):
+        with pytest.raises(CsvFormatError, match="Cannot decode"):
             await import_transactions_from_csv_path(
                 session=session,
                 account_id=acc["id"],
@@ -272,7 +273,7 @@ async def test_csv_import_no_header_row_raises(
 
     session_factory = test_app._transport.app.state.session_factory  # type: ignore[attr-defined]
     async with session_factory() as session:
-        with pytest.raises(ValueError, match="no header"):
+        with pytest.raises(CsvFormatError, match="no header"):
             await import_transactions_from_csv_path(
                 session=session,
                 account_id=acc["id"],

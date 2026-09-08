@@ -14,6 +14,7 @@ from my_private_finances.services.csv_import import (
     ColumnMap,
     import_transactions_from_csv_path,
 )
+from my_private_finances.services.exceptions import NotFoundError, ServiceError
 from my_private_finances.services.recurring_detection import run_detection
 
 router = APIRouter(prefix="/imports", tags=["imports"])
@@ -106,9 +107,7 @@ async def _run_import(
     if profile_id is not None:
         profile = await session.get(CsvProfile, profile_id)
         if profile is None:
-            raise HTTPException(
-                status_code=404, detail=f"CSV profile {profile_id} not found"
-            )
+            raise NotFoundError(f"CSV profile {profile_id} not found")
         profile_delimiter = profile.delimiter
         profile_date_format = profile.date_format
         profile_decimal_comma = profile.decimal_comma
@@ -137,12 +136,12 @@ async def _run_import(
             row_filters=row_filters,
             row_exclude_filters=row_exclude_filters,
         )
-    except ValueError as e:
-        msg = str(e)
-        logger.warning("CSV import rejected: account_id=%d, reason=%s", account_id, msg)
-        if "not found" in msg:
-            raise HTTPException(status_code=404, detail=msg) from e
-        raise HTTPException(status_code=400, detail=msg) from e
+    except ServiceError as e:
+        # Central handler maps this to its status code; log the account context.
+        logger.warning(
+            "CSV import rejected: account_id=%d, reason=%s", account_id, e.detail
+        )
+        raise
 
     if result.created > 0:
         try:

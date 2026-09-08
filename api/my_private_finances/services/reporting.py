@@ -35,6 +35,7 @@ from my_private_finances.schemas import (
     SpendingTrendReport,
     TopSpending,
 )
+from my_private_finances.services.exceptions import NotFoundError, ValidationError
 from my_private_finances.utils.money import money_from_db
 from my_private_finances.utils.sql import table
 
@@ -43,18 +44,12 @@ _CENTS = Decimal("0.01")
 _HUNDRED = Decimal("100")
 
 
-class ReportError(Exception):
-    """Base class for reporting input errors; carries an HTTP status code."""
-
-    status_code = 400
+class InvalidMonth(ValidationError):
+    """The ``month`` query parameter isn't a valid ``YYYY-MM`` value."""
 
 
-class InvalidMonth(ReportError):
-    status_code = 422
-
-
-class AccountNotFound(ReportError):
-    status_code = 404
+class AccountNotFound(NotFoundError):
+    """The requested ``account_id`` doesn't exist."""
 
 
 # --------------------------------------------------------------------------- #
