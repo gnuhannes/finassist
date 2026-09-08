@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from sqlmodel import select
 from starlette.background import BackgroundTask
@@ -40,17 +41,23 @@ def _serialize(obj: Any) -> Any:
     raise TypeError(f"Cannot JSON-serialize {type(obj)!r}")
 
 
+def _sqlite_backup(src_path: str, dst_path: str) -> None:
+    src = sqlite3.connect(src_path)
+    dst = sqlite3.connect(dst_path)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+
+
 @router.get("/sqlite")
 async def export_sqlite(request: Request) -> FileResponse:
     db_path = sqlite_path_from_engine(request.app.state.engine)
     tmp = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
     tmp.close()
 
-    src = sqlite3.connect(str(db_path))
-    dst = sqlite3.connect(tmp.name)
-    src.backup(dst)
-    dst.close()
-    src.close()
+    await run_in_threadpool(_sqlite_backup, str(db_path), tmp.name)
 
     filename = f"my_private_finances_{date.today()}.sqlite"
     logger.info("SQLite export prepared: %s", tmp.name)

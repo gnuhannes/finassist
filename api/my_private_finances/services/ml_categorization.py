@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import joblib
+from fastapi.concurrency import run_in_threadpool
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
@@ -33,6 +35,32 @@ def _feature_text(tx: Transaction) -> str:
     return " ".join(parts).strip()
 
 
+def _fit_and_save(texts: list[str], labels: list[Any], model_path: Path) -> None:
+    """CPU-bound: fit the pipeline and persist it. Runs in a worker thread."""
+    pipeline: Pipeline = Pipeline(
+        [
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    sublinear_tf=True, analyzer="char_wb", ngram_range=(2, 5)
+                ),
+            ),
+            ("clf", CalibratedClassifierCV(LinearSVC())),
+        ]
+    )
+    pipeline.fit(texts, labels)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline, model_path)
+
+
+def _load_and_predict(model_path: Path, texts: list[str]) -> tuple[Any, Any]:
+    """CPU/IO-bound: load the model and score *texts*. Runs in a worker thread."""
+    pipeline: Pipeline = joblib.load(model_path)
+    predicted_ids = pipeline.predict(texts)
+    confidence_scores = pipeline.predict_proba(texts).max(axis=1)
+    return predicted_ids, confidence_scores
+
+
 async def train(session: AsyncSession) -> TrainResult:
     """Query categorized transactions, fit ML pipeline, persist to disk."""
     result = await session.execute(
@@ -49,22 +77,7 @@ async def train(session: AsyncSession) -> TrainResult:
     texts = [_feature_text(tx) for tx in transactions]
     labels = [tx.category_id for tx in transactions]
 
-    pipeline: Pipeline = Pipeline(
-        [
-            (
-                "tfidf",
-                TfidfVectorizer(
-                    sublinear_tf=True, analyzer="char_wb", ngram_range=(2, 5)
-                ),
-            ),
-            ("clf", CalibratedClassifierCV(LinearSVC())),
-        ]
-    )
-    pipeline.fit(texts, labels)
-
-    model_path = _model_path()
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, model_path)
+    await run_in_threadpool(_fit_and_save, texts, labels, _model_path())
 
     num_categories = len(set(labels))
     logger.info(
@@ -81,8 +94,6 @@ async def suggest(session: AsyncSession) -> list[Suggestion]:
     if not model_path.exists():
         raise ColdStartError("No trained model found. Run /ml/train first.")
 
-    pipeline: Pipeline = joblib.load(model_path)
-
     # Load uncategorized transactions
     result = await session.execute(
         select(Transaction).where(Transaction.category_id.is_(None))  # type: ignore[union-attr]
@@ -97,9 +108,9 @@ async def suggest(session: AsyncSession) -> list[Suggestion]:
     categories = {cat.id: cat for cat in cat_result.scalars().all()}
 
     texts = [_feature_text(tx) for tx in transactions]
-    predicted_ids = pipeline.predict(texts)
-    probabilities = pipeline.predict_proba(texts)
-    confidence_scores = probabilities.max(axis=1)
+    predicted_ids, confidence_scores = await run_in_threadpool(
+        _load_and_predict, model_path, texts
+    )
 
     suggestions: list[Suggestion] = []
     for tx, cat_id, confidence in zip(transactions, predicted_ids, confidence_scores):
