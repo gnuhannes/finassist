@@ -8,6 +8,7 @@ from typing import Annotated, Any, Optional, cast
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
+from my_private_finances.utils.money import money_from_db
 from my_private_finances.api.routes.reports import _parse_month, _resolve_currency
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Category, Transaction
@@ -81,7 +82,7 @@ async def get_spending_trend(
         bdate: date = row.booking_date
         cat_id: int | None = row.category_id
         cat_name: str | None = row.category_name
-        amount = Decimal(str(row.amount))
+        amount = money_from_db(row.amount)
 
         cat_names[cat_id] = cat_name
 

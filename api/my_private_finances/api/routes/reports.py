@@ -9,6 +9,7 @@ from fastapi.params import Query
 from sqlalchemy import case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from my_private_finances.utils.money import money_from_db
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Account, Budget, Category, Transaction
 from my_private_finances.schemas import (
@@ -84,9 +85,9 @@ async def get_monthly_report(
 
     totals_row = (await session.execute(stmt_totals)).one()
     tx_count = int(totals_row.tx_count)
-    net_total = Decimal(str(totals_row.net_total))
-    income_total = Decimal(str(totals_row.income_total))
-    expense_total = Decimal(str(totals_row.expense_total))
+    net_total = money_from_db(totals_row.net_total)
+    income_total = money_from_db(totals_row.income_total)
+    expense_total = money_from_db(totals_row.expense_total)
 
     stmt_payees = (
         select(
@@ -102,7 +103,7 @@ async def get_monthly_report(
 
     payees_rows = (await session.execute(stmt_payees)).all()
     payees = [
-        PayeeTotal(payee=r.payee, total=Decimal(str(r.total))) for r in payees_rows
+        PayeeTotal(payee=r.payee, total=money_from_db(r.total)) for r in payees_rows
     ]
 
     cat = cast(Any, Category).__table__
@@ -122,7 +123,7 @@ async def get_monthly_report(
     categories = [
         CategoryTotal(
             category_name=r.category_name,
-            total=Decimal(str(r.total)),
+            total=money_from_db(r.total),
         )
         for r in cat_rows
     ]
@@ -148,7 +149,7 @@ async def get_monthly_report(
             booking_date=r.booking_date,
             payee=r.payee,
             purpose=r.purpose,
-            amount=Decimal(str(r.amount)),
+            amount=money_from_db(r.amount),
             category_name=r.category_name,
         )
         for r in spending_rows
@@ -219,13 +220,13 @@ async def get_budget_vs_actual(
         .group_by(tx.c.category_id)
     )
     actual_rows = (await session.execute(stmt_actuals)).all()
-    actuals = {r.category_id: Decimal(str(r.actual)) for r in actual_rows}
+    actuals = {r.category_id: money_from_db(r.actual) for r in actual_rows}
 
     result = []
     for row in budget_rows:
         raw_actual = actuals.get(row.category_id, Decimal("0"))
         actual = abs(raw_actual)
-        budgeted = Decimal(str(row.budgeted))
+        budgeted = money_from_db(row.budgeted)
         result.append(
             BudgetComparison(
                 category_id=row.category_id,
@@ -276,7 +277,7 @@ async def get_fixed_vs_variable(
     totals: dict[str | None, Decimal] = {}
     breakdown: list[CostTypeBreakdown] = []
     for r in rows:
-        total = abs(Decimal(str(r.total)))
+        total = abs(money_from_db(r.total))
         totals[r.cost_type] = total
         breakdown.append(
             CostTypeBreakdown(

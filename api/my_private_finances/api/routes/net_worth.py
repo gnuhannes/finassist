@@ -18,6 +18,7 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from sqlalchemy import select
 
+from my_private_finances.utils.money import money_from_db
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Account, Transaction
 from my_private_finances.schemas import (
@@ -100,7 +101,7 @@ async def get_net_worth(
     }  # type: ignore[misc]
     for row in tx_rows:
         tx_by_account[row.account_id].append(
-            (row.booking_date, Decimal(str(row.amount)))
+            (row.booking_date, money_from_db(row.amount))
         )
 
     # Build monthly balance series per account

@@ -9,6 +9,7 @@ from fastapi.params import Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from my_private_finances.utils.money import money_from_db
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Category, RecurringPattern
 from my_private_finances.schemas import (
@@ -159,7 +160,7 @@ async def get_recurring_summary(
     pattern_count = 0
 
     for r in rows:
-        freq_total = Decimal(str(r.total))
+        freq_total = money_from_db(r.total)
         count = int(r.pattern_count)
         pattern_count += count
         by_frequency.append(
