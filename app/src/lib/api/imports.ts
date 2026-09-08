@@ -12,6 +12,7 @@ export type ImportErrorDetail = {
 export type ImportResult = {
   total_rows: number;
   created: number;
+  skipped: number;
   duplicates: number;
   failed: number;
   errors: ImportErrorDetail[];

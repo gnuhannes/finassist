@@ -69,6 +69,8 @@ def _match_amount(amount: Decimal, operator: str, value: str) -> bool:
         threshold = Decimal(value)
     except InvalidOperation:
         return False
+    if not threshold.is_finite():
+        return False
     op = _AMOUNT_OPS.get(operator)
     if op is None:
         logger.warning("Unknown amount operator: %r", operator)

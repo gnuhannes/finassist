@@ -86,9 +86,12 @@ def _parse_decimal(value: str, *, decimal_comma: bool) -> Decimal:
     raw = value.strip()
     normalized = raw.replace(".", "").replace(",", ".") if decimal_comma else raw
     try:
-        return Decimal(normalized)
+        parsed = Decimal(normalized)
     except InvalidOperation:
         raise ValueError(f"Invalid decimal value: '{raw}'")
+    if not parsed.is_finite():
+        raise ValueError(f"Non-finite decimal value: '{raw}'")
+    return parsed
 
 
 def _row_fingerprint(row: dict[str, Any]) -> str:

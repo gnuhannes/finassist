@@ -96,12 +96,14 @@ async def update_transaction(
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    if payload.category_id is not None:
-        cat = await session.get(Category, payload.category_id)
-        if cat is None:
-            raise HTTPException(status_code=422, detail="Category not found")
+    fields = payload.model_dump(exclude_unset=True)
 
-    db_obj.category_id = payload.category_id
+    if "category_id" in fields:
+        category_id = fields["category_id"]
+        if category_id is not None and await session.get(Category, category_id) is None:
+            raise HTTPException(status_code=422, detail="Category not found")
+        db_obj.category_id = category_id
+
     await session.commit()
     await session.refresh(db_obj)
 
@@ -142,8 +144,16 @@ async def list_transactions(
         filters.append(Transaction.booking_date >= date_from)  # type: ignore[arg-type]
     if date_to is not None:
         filters.append(Transaction.booking_date <= date_to)  # type: ignore[arg-type]
-    if category_filter == "uncategorized":
-        filters.append(Transaction.category_id.is_(None))  # type: ignore[union-attr]
+    if category_filter is not None:
+        if category_filter == "uncategorized":
+            filters.append(Transaction.category_id.is_(None))  # type: ignore[union-attr]
+        elif category_filter.isdigit():
+            filters.append(Transaction.category_id == int(category_filter))  # type: ignore[arg-type]
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail="category_filter must be 'uncategorized' or a category id",
+            )
     if q is not None:
         filters.append(
             or_(
