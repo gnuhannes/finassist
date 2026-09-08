@@ -42,8 +42,9 @@ test:
 test-cov:
 	poetry run pytest --cov=my_private_finances --cov-report=term-missing
 
-# CI/Gate: fail under MIN_COVERAGE
-MIN_COVERAGE ?= 75
+# CI/Gate: fail under MIN_COVERAGE.
+# Ratchet only upward toward the 80% target (ECC standard). Never lower it.
+MIN_COVERAGE ?= 76
 
 .PHONY: coverage
 coverage:

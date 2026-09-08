@@ -16,7 +16,6 @@ from my_private_finances.services.watch_folder import (
 )
 from tests.helpers import create_account
 
-
 # ---------------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------------

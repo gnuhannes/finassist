@@ -21,3 +21,11 @@ coverage/
 htmlcov/
 *.log
 CLAUDE.md
+
+# Playwright E2E
+app/.e2e/
+api/.e2e/
+app/playwright-report/
+app/test-results/
+app/blob-report/
+app/playwright/.cache/

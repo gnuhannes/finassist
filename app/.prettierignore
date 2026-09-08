@@ -2,3 +2,9 @@ dist
 node_modules
 coverage
 pnpm-lock.yaml
+
+# Playwright artifacts
+.e2e
+playwright-report
+test-results
+blob-report

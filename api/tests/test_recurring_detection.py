@@ -14,7 +14,6 @@ from my_private_finances.services.recurring_detection import (
     run_detection,
 )
 
-
 # ── Pure heuristic tests (no DB) ──
 
 

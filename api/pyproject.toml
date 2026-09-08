@@ -42,6 +42,23 @@ dev = [
     "pytest-cov (>=7.0.0,<8.0.0)"
 ]
 
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+# Ruff is the sole Python linter and formatter for this project — no black,
+# isort, or flake8. Rule "I" provides import sorting (the isort replacement);
+# "E"/"F" (pycodestyle + pyflakes) are on by default.
+extend-select = ["I"]
+
+[[tool.mypy.overrides]]
+# scikit-learn and joblib ship no type information. Configured here rather than
+# with fragile per-import `# type: ignore` comments that Ruff's formatter can
+# detach from the line mypy reports.
+module = ["sklearn.*", "joblib.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

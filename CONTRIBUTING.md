@@ -97,6 +97,23 @@ pnpm rebuild
 
 ***
 
+### End-to-end tests (Playwright)
+
+E2E tests live in `app/e2e/` and boot the real backend + frontend. They are
+**not** part of `make ci` — run them separately:
+
+```bash
+cd app
+pnpm exec playwright install chromium   # one-time
+cd ..
+make e2e
+```
+
+Requires Poetry (backend) and pnpm (frontend) set up. See
+`docs/adr/0005-testing-strategy.md`.
+
+***
+
 ### Contributing Workflow
 1. Fork the repository 
 2. Create a feature branch from main (no direct commits to main)

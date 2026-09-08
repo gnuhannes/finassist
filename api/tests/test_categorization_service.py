@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-
 from my_private_finances.models import CategorizationRule, Transaction
 from my_private_finances.services.categorization import match_transaction
 
