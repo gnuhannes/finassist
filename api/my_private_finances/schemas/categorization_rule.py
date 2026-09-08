@@ -4,7 +4,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from my_private_finances.schemas.base import StrictSchema
+from my_private_finances.schemas.base import ReadSchema, StrictSchema
 
 FieldName = Literal["payee", "purpose", "amount"]
 Operator = Literal[
@@ -34,7 +34,7 @@ class RuleUpdate(StrictSchema):
     category_id: Optional[int] = None
 
 
-class RuleRead(BaseModel):
+class RuleRead(ReadSchema):
     id: int
     position: int
     field: str

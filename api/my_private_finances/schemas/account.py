@@ -4,9 +4,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from my_private_finances.schemas.base import StrictSchema
+from my_private_finances.schemas.base import ReadSchema, StrictSchema
 
 
 class AccountCreate(StrictSchema):
@@ -19,7 +19,7 @@ class AccountUpdate(StrictSchema):
     opening_balance_date: Optional[date] = None
 
 
-class AccountRead(BaseModel):
+class AccountRead(ReadSchema):
     id: int
     name: str
     currency: str

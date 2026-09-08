@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from my_private_finances.schemas.base import StrictSchema
+from my_private_finances.schemas.base import ReadSchema, StrictSchema
 
 CostType = Literal["fixed", "variable"]
 
@@ -21,7 +21,7 @@ class CategoryUpdate(StrictSchema):
     cost_type: Optional[CostType] = None
 
 
-class CategoryRead(BaseModel):
+class CategoryRead(ReadSchema):
     id: int
     name: str
     parent_id: Optional[int] = None

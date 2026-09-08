@@ -20,18 +20,6 @@ router = APIRouter(prefix="/csv-profiles", tags=["csv-profiles"])
 logger = logging.getLogger(__name__)
 
 
-def _to_read(profile: CsvProfile) -> CsvProfileRead:
-    assert profile.id is not None
-    return CsvProfileRead(
-        id=profile.id,
-        name=profile.name,
-        delimiter=profile.delimiter,
-        date_format=profile.date_format,
-        decimal_comma=profile.decimal_comma,
-        column_map=profile.column_map,
-    )
-
-
 @router.get("", response_model=list[CsvProfileRead])
 async def list_csv_profiles(session: SessionDep) -> list[CsvProfileRead]:
     profiles = (
@@ -39,7 +27,7 @@ async def list_csv_profiles(session: SessionDep) -> list[CsvProfileRead]:
         .scalars()
         .all()
     )
-    return [_to_read(p) for p in profiles]
+    return [CsvProfileRead.model_validate(p) for p in profiles]
 
 
 @router.post("", response_model=CsvProfileRead, status_code=201)
@@ -64,7 +52,7 @@ async def create_csv_profile(
         ) from e
     await session.refresh(db_obj)
     logger.info("CSV profile created: id=%d, name=%r", db_obj.id, db_obj.name)
-    return _to_read(db_obj)
+    return CsvProfileRead.model_validate(db_obj)
 
 
 @router.get("/{profile_id}", response_model=CsvProfileRead)
@@ -72,7 +60,7 @@ async def get_csv_profile(profile_id: int, session: SessionDep) -> CsvProfileRea
     db_obj = await session.get(CsvProfile, profile_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Profile not found")
-    return _to_read(db_obj)
+    return CsvProfileRead.model_validate(db_obj)
 
 
 @router.put("/{profile_id}", response_model=CsvProfileRead)
@@ -106,7 +94,7 @@ async def update_csv_profile(
 
     await session.refresh(db_obj)
     logger.info("CSV profile updated: id=%d, name=%r", db_obj.id, db_obj.name)
-    return _to_read(db_obj)
+    return CsvProfileRead.model_validate(db_obj)
 
 
 @router.delete("/{profile_id}", status_code=204)

@@ -12,32 +12,21 @@ from my_private_finances.schemas import AccountCreate, AccountRead, AccountUpdat
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
-def _to_read(a: Account) -> AccountRead:
-    assert a.id is not None
-    return AccountRead(
-        id=a.id,
-        name=a.name,
-        currency=a.currency,
-        opening_balance=a.opening_balance,
-        opening_balance_date=a.opening_balance_date,
-    )
-
-
 @router.post("", response_model=AccountRead, status_code=201)
 async def create_account(
     account: Annotated[AccountCreate, Body()], session: SessionDep
-):
+) -> Account:
     db_obj = Account(name=account.name, currency=account.currency)
     session.add(db_obj)
     await session.commit()
     await session.refresh(db_obj)
-    return _to_read(db_obj)
+    return db_obj
 
 
 @router.get("", response_model=list[AccountRead])
-async def list_accounts(session: SessionDep):
+async def list_accounts(session: SessionDep) -> list[Account]:
     res = await session.execute(select(Account).order_by(Account.id))  # type: ignore[arg-type]
-    return [_to_read(a) for a in res.scalars().all()]
+    return list(res.scalars().all())
 
 
 @router.patch("/{account_id}", response_model=AccountRead)
@@ -45,7 +34,7 @@ async def update_account(
     account_id: int,
     payload: Annotated[AccountUpdate, Body()],
     session: SessionDep,
-):
+) -> Account:
     db_obj = await session.get(Account, account_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -57,4 +46,4 @@ async def update_account(
 
     await session.commit()
     await session.refresh(db_obj)
-    return _to_read(db_obj)
+    return db_obj

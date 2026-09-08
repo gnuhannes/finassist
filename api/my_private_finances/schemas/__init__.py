@@ -1,5 +1,5 @@
 from .account import AccountCreate, AccountRead, AccountUpdate
-from .base import StrictSchema
+from .base import ReadSchema, StrictSchema
 from .budget import BudgetCreate, BudgetRead, BudgetUpdate
 from .categorization_rule import (
     ApplyResult,
@@ -69,6 +69,7 @@ __all__ = [
     "TransactionUpdate",
     "TransactionListResponse",
     "StrictSchema",
+    "ReadSchema",
     "MonthlyReport",
     "PayeeTotal",
     "TopSpending",
