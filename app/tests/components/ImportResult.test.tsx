@@ -6,6 +6,7 @@ import type { ImportResult as ImportResultType } from "../../src/lib/api";
 const successResult: ImportResultType = {
   total_rows: 10,
   created: 8,
+  skipped: 0,
   duplicates: 2,
   failed: 0,
   errors: [],
@@ -15,6 +16,7 @@ const successResult: ImportResultType = {
 const resultWithErrors: ImportResultType = {
   total_rows: 5,
   created: 2,
+  skipped: 0,
   duplicates: 1,
   failed: 2,
   errors: [

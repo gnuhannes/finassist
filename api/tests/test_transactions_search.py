@@ -196,3 +196,36 @@ async def test_search_combined_with_account(test_app: AsyncClient) -> None:
     body = res.json()
     assert body["total"] == 1
     assert body["items"][0]["account_id"] == acc1["id"]
+
+
+@pytest.mark.asyncio
+async def test_filter_by_category_id(test_app: AsyncClient) -> None:
+    from tests.helpers import create_category
+
+    acc = await create_account(test_app)
+    food = await create_category(test_app, name="Food")
+    rent = await create_category(test_app, name="Rent")
+    t1 = await create_transaction(test_app, account_id=acc["id"], external_id="c1")
+    await create_transaction(test_app, account_id=acc["id"], external_id="c2")
+    await test_app.patch(
+        f"/api/transactions/{t1['id']}", json={"category_id": food["id"]}
+    )
+
+    res = await test_app.get(
+        "/api/transactions", params={"category_filter": str(food["id"])}
+    )
+    assert res.status_code == 200
+    assert res.json()["total"] == 1
+
+    empty = await test_app.get(
+        "/api/transactions", params={"category_filter": str(rent["id"])}
+    )
+    assert empty.json()["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_invalid_category_filter_is_422(test_app: AsyncClient) -> None:
+    res = await test_app.get(
+        "/api/transactions", params={"category_filter": "not-a-thing"}
+    )
+    assert res.status_code == 422
