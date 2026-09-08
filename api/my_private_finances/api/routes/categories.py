@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Body, HTTPException
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from my_private_finances.deps import SessionDep
@@ -77,6 +76,10 @@ async def delete_category(category_id: int, session: SessionDep) -> None:
         raise HTTPException(status_code=404, detail="Category not found")
 
     # Check if any transactions reference this category
+    # Transactions are the one relationship we refuse to touch implicitly — the
+    # user must re-categorise or accept losing the categorisation first. Every
+    # other reference is handled by the FK's ON DELETE (#117): budgets and rules
+    # CASCADE, sub-categories and recurring patterns SET NULL.
     result = await session.execute(
         select(Transaction.id).where(Transaction.category_id == category_id).limit(1)
     )
@@ -87,17 +90,4 @@ async def delete_category(category_id: int, session: SessionDep) -> None:
         )
 
     await session.delete(db_obj)
-    try:
-        await session.commit()
-    except IntegrityError as e:
-        # Foreign keys are enforced (PRAGMA foreign_keys=ON): the category is
-        # still referenced by a budget, categorization rule, sub-category, or
-        # recurring pattern.
-        await session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Category is still referenced (budget, rule, sub-category, or "
-                "recurring pattern) and cannot be deleted"
-            ),
-        ) from e
+    await session.commit()

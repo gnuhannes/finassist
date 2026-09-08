@@ -10,7 +10,7 @@ from my_private_finances.models.mixins import TimestampMixin
 
 
 class BudgetBase(SQLModel):
-    category_id: int = Field(foreign_key="category.id")
+    category_id: int = Field(foreign_key="category.id", ondelete="CASCADE")
     amount: Decimal = Field(sa_column=Column(Numeric(12, 2), nullable=False))
 
 

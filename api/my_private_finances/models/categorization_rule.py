@@ -18,4 +18,4 @@ class CategorizationRule(TimestampMixin, table=True):
     field: str = Field(sa_column=Column(String(20), nullable=False))
     operator: str = Field(sa_column=Column(String(20), nullable=False))
     value: str = Field(sa_column=Column(String(255), nullable=False))
-    category_id: int = Field(foreign_key="category.id")
+    category_id: int = Field(foreign_key="category.id", ondelete="CASCADE")

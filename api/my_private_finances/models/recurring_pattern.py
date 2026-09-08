@@ -11,7 +11,7 @@ from my_private_finances.models.mixins import TimestampMixin
 
 
 class RecurringPatternBase(SQLModel):
-    account_id: int = Field(foreign_key="account.id", index=True)
+    account_id: int = Field(foreign_key="account.id", ondelete="CASCADE", index=True)
     payee: str = Field(sa_column=Column(String(255), nullable=False))
     typical_amount: Decimal = Field(sa_column=Column(Numeric(14, 2), nullable=False))
     frequency: str = Field(sa_column=Column(String(20), nullable=False))
@@ -20,7 +20,9 @@ class RecurringPatternBase(SQLModel):
     occurrence_count: int = Field(default=0)
     is_active: bool = Field(default=True)
     user_confirmed: bool = Field(default=False)
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id")
+    category_id: Optional[int] = Field(
+        default=None, foreign_key="category.id", ondelete="SET NULL"
+    )
 
 
 class RecurringPattern(TimestampMixin, RecurringPatternBase, table=True):

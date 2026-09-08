@@ -13,9 +13,13 @@ class TransferCandidate(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Negative leg (outgoing transaction, e.g. -500 in Account 1)
-    from_transaction_id: int = Field(foreign_key="transaction.id", index=True)
+    from_transaction_id: int = Field(
+        foreign_key="transaction.id", ondelete="CASCADE", index=True
+    )
     # Positive leg (incoming transaction, e.g. +500 in Account 2)
-    to_transaction_id: int = Field(foreign_key="transaction.id", index=True)
+    to_transaction_id: int = Field(
+        foreign_key="transaction.id", ondelete="CASCADE", index=True
+    )
 
     confidence: Decimal = Field(sa_column=Column(Numeric(3, 2), nullable=False))
 

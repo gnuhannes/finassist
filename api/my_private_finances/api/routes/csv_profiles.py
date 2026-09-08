@@ -102,13 +102,8 @@ async def delete_csv_profile(profile_id: int, session: SessionDep) -> None:
     db_obj = await session.get(CsvProfile, profile_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Profile not found")
+    # watch_folder_config.profile_id is ON DELETE SET NULL (#117): any config
+    # using this profile falls back to the built-in CSV defaults.
     await session.delete(db_obj)
-    try:
-        await session.commit()
-    except IntegrityError as e:
-        await session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Profile is in use by a watch-folder config and cannot be deleted",
-        ) from e
+    await session.commit()
     logger.info("CSV profile deleted: id=%d", profile_id)
