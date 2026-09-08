@@ -72,6 +72,20 @@ Local scikit-learn pipeline (TF-IDF char n-grams + CalibratedClassifierCV/Linear
 
 ---
 
+### [160 — Transaction Splitting](160-transaction-splitting.md) 🔜
+**Goal:** Split one bank transaction across several categories — by absolute amount or by
+percentage (e.g. a single transfer covering rent + utilities).
+
+New `transaction_split` child table; `Transaction.category_id` stays as the fast path for
+single-category transactions (no data migration). Split amounts must sum exactly to the
+transaction total; splitting is attribution-only, so balances and net worth are untouched.
+Category reports (monthly breakdown, budget-vs-actual, fixed-vs-variable, spending-trend)
+attribute each portion via a UNION-ALL selectable in `services/reporting.py`. Absolute vs.
+percentage is a frontend concern — the API stores absolute amounts only. **Foundation for
+[100 — Bill Scanning](100-bill-scanning.md)**; sequence after issue #104.
+
+---
+
 ## Mid-term
 
 ### [130 — PWA + LAN Mobile Access](130-pwa-lan-access.md) 💡

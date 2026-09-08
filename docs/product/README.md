@@ -22,4 +22,5 @@ Iteration-by-iteration product specs for My Private Finances.
 | [150](150-android-app.md) | Android App (Capacitor) | 💡 Long-term |
 | [090](090-cash-transactions.md) | Cash Transactions | 💡 Idea |
 | [100](100-bill-scanning.md) | Bill Scanning & Line-Item Split | 💡 Idea |
+| [160](160-transaction-splitting.md) | Transaction Splitting (multi-category) | 🔜 Planned |
 | — | [Backlog](backlog.md) | Small fixes & UX improvements |
