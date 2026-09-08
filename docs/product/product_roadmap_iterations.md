@@ -43,6 +43,17 @@ Local scikit-learn pipeline (TF-IDF char n-grams + CalibratedClassifierCV/Linear
 
 ## Planned
 
+### [105 — First-Run Setup](105-first-run-setup.md) 🔜
+**Goal:** Guide a new user from an empty database to a usable dashboard.
+
+Full-screen wizard shown on first launch: create a first account **with a starting balance
+in one step**, pick a localized starter category set, optionally import a first statement.
+Backed by a new `AppSettings` singleton table (`onboarding_completed_at`, `default_currency`,
+`locale`); a migration stamps existing databases as done so they skip the wizard. Precursor
+to [110](110-desktop-app.md), where every first launch is a blank database.
+
+---
+
 ### [110 — Desktop App](110-desktop-app.md) 🔜
 **Goal:** Installable, self-contained desktop app for Windows, macOS, and Linux.
 
