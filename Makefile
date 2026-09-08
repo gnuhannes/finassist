@@ -15,6 +15,7 @@ help:
 	@echo "  make fe-format-check - Frontend prettier check"
 	@echo "  make fe-typecheck  - Frontend typecheck"
 	@echo "  make fe-test       - Frontend tests (if configured)"
+	@echo "  make e2e           - Playwright E2E smoke (boots api + app; not in ci)"
 	@echo "  make sync          - Install deps (backend + frontend)"
 
 .PHONY: ci
@@ -46,6 +47,10 @@ fe-typecheck:
 
 fe-test:
 	$(MAKE) -C app test
+
+.PHONY: e2e
+e2e:
+	$(MAKE) -C app e2e
 
 .PHONY: sync sync-backend sync-frontend
 sync: sync-backend sync-frontend

@@ -62,6 +62,13 @@ make fe-test          # vitest run
 cd app && pnpm run test -- tests/path/to/file.test.ts                  # single test
 ```
 
+E2E (`app/e2e/`, Playwright — not part of `make ci`):
+
+```
+make e2e              # boots api + app, runs Playwright (Chromium)
+cd app && pnpm exec playwright install chromium                        # one-time
+```
+
 Dev servers:
 
 ```
@@ -126,6 +133,8 @@ clients; hooks import from `../lib/api/<module>` directly.
 - Backend coverage gate is **`MIN_COVERAGE` in `api/Makefile`** (currently 76%),
   ratcheting toward ECC's 80% target. Never lower it; raise it when coverage
   climbs. New code should land with tests.
-- There is **no E2E / Playwright layer** — tests are pytest (backend) and vitest
-  (frontend) only.
+- **Test layers:** pytest (backend unit + API via `AsyncClient`) and vitest
+  (frontend) run in `make ci`. Playwright E2E (`app/e2e/`) is a separate
+  `make e2e` / CI job — keep it out of `make ci`. Strategy + roadmap:
+  `docs/adr/0005-testing-strategy.md`.
 - Linter/formatter config files are fixed; fix the code, not the config.

@@ -59,3 +59,55 @@ jobs:
           set -euxo pipefail
           make -n ci || true
           make ci
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Cache backend venv
+        uses: actions/cache@v4
+        with:
+          path: api/.venv
+          key: venv-${{ runner.os }}-py312-${{ hashFiles('api/poetry.lock') }}
+
+      - name: Install backend dependencies
+        working-directory: api
+        run: poetry install --no-interaction
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        working-directory: app
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: make e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: app/playwright-report/
+          retention-days: 7
