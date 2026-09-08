@@ -17,10 +17,10 @@ export default defineConfig({
       // Starting floor — a ratchet, like the backend's MIN_COVERAGE. Raise these
       // as coverage grows; never lower them.
       thresholds: {
-        lines: 30,
-        functions: 20,
-        branches: 24,
-        statements: 30,
+        lines: 38,
+        functions: 24,
+        branches: 32,
+        statements: 38,
       },
     },
   },
