@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from my_private_finances.models import RecurringPattern, Transaction
+from my_private_finances.utils.money import money_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,7 @@ async def fetch_transaction_groups(
     groups: dict[str, list[tuple[date, Decimal, int | None]]] = {}
     for r in rows:
         payee = str(r.norm_payee)
-        entry = (r.booking_date, Decimal(str(r.amount)), r.category_id)
+        entry = (r.booking_date, money_from_db(r.amount), r.category_id)
         groups.setdefault(payee, []).append(entry)
 
     return groups

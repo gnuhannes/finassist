@@ -7,6 +7,7 @@ from typing import Annotated, Any, Optional, cast
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
+from my_private_finances.utils.money import money_from_db
 from my_private_finances.api.routes.reports import _resolve_currency
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Transaction
@@ -51,7 +52,7 @@ async def get_annual_report(
     for row in rows:
         bdate: date = row.booking_date
         month_str = f"{bdate.year}-{bdate.month:02d}"
-        amount = Decimal(str(row.amount))
+        amount = money_from_db(row.amount)
         if amount > _ZERO:
             income_by_month[month_str] = income_by_month.get(month_str, _ZERO) + amount
         else:

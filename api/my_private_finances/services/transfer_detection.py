@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from my_private_finances.models import Account, Transaction
+from my_private_finances.utils.money import money_from_db
 from my_private_finances.models.transfer_candidate import TransferCandidate
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ async def detect_transfer_candidates(
     window = timedelta(days=window_days)
 
     for out_tx in outgoing:
-        out_abs = abs(Decimal(str(out_tx.amount)))
+        out_abs = abs(money_from_db(out_tx.amount))
 
         for in_tx in incoming:
             # Must be different accounts
@@ -79,7 +80,7 @@ async def detect_transfer_candidates(
                 continue
 
             # Amount must match exactly
-            in_abs = Decimal(str(in_tx.amount))
+            in_abs = money_from_db(in_tx.amount)
             if out_abs != in_abs:
                 continue
 
