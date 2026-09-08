@@ -5,6 +5,8 @@ from typing import Optional
 from sqlalchemy import Column, String
 from sqlmodel import Field, SQLModel
 
+from my_private_finances.models.mixins import TimestampMixin
+
 
 class CategoryBase(SQLModel):
     name: str = Field(sa_column=Column(String(120), nullable=False, index=True))
@@ -14,5 +16,5 @@ class CategoryBase(SQLModel):
     )
 
 
-class Category(CategoryBase, table=True):
+class Category(TimestampMixin, CategoryBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

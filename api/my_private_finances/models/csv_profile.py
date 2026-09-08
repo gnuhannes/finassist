@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from sqlalchemy import JSON, Column, String
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
+
+from my_private_finances.models.mixins import TimestampMixin
 
 
-class CsvProfile(SQLModel, table=True):
+class CsvProfile(TimestampMixin, table=True):
     __tablename__ = "csv_profile"
 
     id: Optional[int] = Field(default=None, primary_key=True)
