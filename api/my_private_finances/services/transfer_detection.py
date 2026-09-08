@@ -19,8 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from my_private_finances.models import Account, Transaction
-from my_private_finances.utils.money import money_from_db
 from my_private_finances.models.transfer_candidate import TransferCandidate
+from my_private_finances.utils.money import money_from_db
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,6 @@ from fastapi.params import Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from my_private_finances.utils.money import money_from_db
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Category, RecurringPattern
 from my_private_finances.schemas import (
@@ -20,6 +19,7 @@ from my_private_finances.schemas import (
 )
 from my_private_finances.services.recurring_detection import run_detection
 from my_private_finances.utils.db_helpers import get_account_or_404
+from my_private_finances.utils.money import money_from_db
 
 router = APIRouter(prefix="/recurring-patterns", tags=["recurring-patterns"])
 
