@@ -9,52 +9,99 @@ export class ApiError extends Error {
   }
 }
 
-// Sent on every request. The backend's destructive endpoints require it (#99):
-// a cross-origin simple request can't set it without a CORS preflight, which
-// the origin allow-list blocks for unknown origins.
-const DEFAULT_HEADERS = {
-  Accept: "application/json",
-  "Content-Type": "application/json",
-  "X-Requested-With": "XMLHttpRequest",
+/** Thrown when a request exceeds its timeout (or its AbortSignal fires). */
+export class TimeoutError extends Error {
+  constructor(path: string) {
+    super(`Request timed out: ${path}`);
+    this.name = "TimeoutError";
+  }
+}
+
+/** Default per-request timeout. Override via `apiRequest(path, { timeoutMs })`. */
+export const DEFAULT_TIMEOUT_MS = 30_000;
+
+type ApiInit = Omit<RequestInit, "signal"> & {
+  /** Extra signal to combine with the timeout (e.g. React Query's). */
+  signal?: AbortSignal;
+  /** Per-request timeout; `0` disables it. */
+  timeoutMs?: number;
 };
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: DEFAULT_HEADERS,
-    ...init,
-  });
-  const body = await res.json().catch(() => null);
+function buildHeaders(init: ApiInit): Headers {
+  const headers = new Headers(init.headers);
+  // The backend's destructive endpoints require this (#99): a cross-origin
+  // simple request can't set a custom header without a CORS preflight, which
+  // the origin allow-list blocks for unknown origins.
+  headers.set("X-Requested-With", "XMLHttpRequest");
+  headers.set("Accept", "application/json");
+  // Only declare a JSON body — never on GET, and let the browser set the
+  // multipart boundary for FormData bodies.
+  if (typeof init.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  return headers;
+}
 
-  if (!res.ok) {
-    throw new ApiError(res.status, body);
+/**
+ * The single fetch primitive. Adds default headers, a timeout, and uniform
+ * `ApiError` / `TimeoutError` handling. Returns the parsed JSON body (or
+ * `undefined` for an empty 2xx response).
+ */
+export async function apiRequest<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...rest } = init;
+
+  const signals: AbortSignal[] = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  if (timeoutMs > 0) {
+    const ac = new AbortController();
+    timer = setTimeout(() => ac.abort(), timeoutMs);
+    signals.push(ac.signal);
+  }
+  if (callerSignal) signals.push(callerSignal);
+  const signal = signals.length ? AbortSignal.any(signals) : undefined;
+
+  let res: Response;
+  try {
+    res = await fetch(path, { ...rest, headers: buildHeaders(init), signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new TimeoutError(path);
+    }
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 
+  const text = await res.text();
+  let body: unknown;
+  try {
+    body = text ? JSON.parse(text) : undefined;
+  } catch {
+    body = null;
+  }
+
+  if (!res.ok) {
+    throw new ApiError(res.status, body ?? null);
+  }
   return body as T;
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  return apiFetch<T>(path);
+export function apiGet<T>(path: string, init?: ApiInit): Promise<T> {
+  return apiRequest<T>(path, init);
 }
 
-export async function apiPost<T>(path: string, data: unknown): Promise<T> {
-  return apiFetch<T>(path, { method: "POST", body: JSON.stringify(data) });
+export function apiPost<T>(path: string, data: unknown, init?: ApiInit): Promise<T> {
+  return apiRequest<T>(path, { ...init, method: "POST", body: JSON.stringify(data) });
 }
 
-export async function apiPut<T>(path: string, data: unknown): Promise<T> {
-  return apiFetch<T>(path, { method: "PUT", body: JSON.stringify(data) });
+export function apiPut<T>(path: string, data: unknown, init?: ApiInit): Promise<T> {
+  return apiRequest<T>(path, { ...init, method: "PUT", body: JSON.stringify(data) });
 }
 
-export async function apiPatch<T>(path: string, data: unknown): Promise<T> {
-  return apiFetch<T>(path, { method: "PATCH", body: JSON.stringify(data) });
+export function apiPatch<T>(path: string, data: unknown, init?: ApiInit): Promise<T> {
+  return apiRequest<T>(path, { ...init, method: "PATCH", body: JSON.stringify(data) });
 }
 
-export async function apiDelete(path: string): Promise<void> {
-  const res = await fetch(path, {
-    method: "DELETE",
-    headers: { "X-Requested-With": "XMLHttpRequest" },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new ApiError(res.status, body);
-  }
+export function apiDelete<T = void>(path: string, init?: ApiInit): Promise<T> {
+  return apiRequest<T>(path, { ...init, method: "DELETE" });
 }

@@ -22,10 +22,10 @@ export function NavBar() {
     <nav className={styles.nav}>
       {/* Always-visible top bar (hamburger row) — desktop: hidden */}
       <div className={styles.bar}>
-        <span className={styles.brand}>My Finances</span>
+        <span className={styles.brand}>{t("nav.brand")}</span>
         <button
           className={styles.hamburger}
-          aria-label="Menu"
+          aria-label={t("nav.menu")}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >

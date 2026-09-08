@@ -118,7 +118,7 @@ export function CsvProfileManager({ onClose }: Props) {
               <li key={p.id} className={styles.item}>
                 <span className={styles.itemName}>{p.name}</span>
                 <span className={styles.itemMeta}>
-                  {p.delimiter === "\t" ? "Tab" : p.delimiter} · {p.date_format}
+                  {p.delimiter === "\t" ? t("csvProfiles.delimTab") : p.delimiter} · {p.date_format}
                   {p.decimal_comma ? " · dec," : ""}
                 </span>
                 <div className={styles.itemActions}>
@@ -162,7 +162,7 @@ export function CsvProfileManager({ onClose }: Props) {
               >
                 <option value=",">,</option>
                 <option value=";">;</option>
-                <option value="&#9;">Tab</option>
+                <option value="&#9;">{t("csvProfiles.delimTab")}</option>
               </select>
             </label>
 
@@ -172,8 +172,8 @@ export function CsvProfileManager({ onClose }: Props) {
                 value={form.date_format}
                 onChange={(e) => setForm((f) => ({ ...f, date_format: e.target.value }))}
               >
-                <option value="iso">ISO (YYYY-MM-DD)</option>
-                <option value="dmy">DMY (DD.MM.YYYY)</option>
+                <option value="iso">{t("csvProfiles.dateFormatIso")}</option>
+                <option value="dmy">{t("csvProfiles.dateFormatDmy")}</option>
               </select>
             </label>
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useAccounts } from "../hooks/useAccounts";
@@ -71,8 +71,10 @@ function AccountRow({
           </div>
         ) : hasSetup ? (
           <span className={styles.openingInfo}>
-            {formatMoneyString(account.opening_balance!, currency)} as of{" "}
-            {account.opening_balance_date}
+            {t("netWorth.openingAsOf", {
+              amount: formatMoneyString(account.opening_balance!, currency),
+              date: account.opening_balance_date,
+            })}
             <button type="button" className={styles.editBtn} onClick={() => setEditing(true)}>
               {t("common.edit")}
             </button>

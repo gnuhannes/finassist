@@ -14,7 +14,8 @@
     "e2e": "playwright test",
     "e2e:report": "playwright show-report",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "test:coverage": "vitest run --coverage -c vitest.config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
@@ -35,6 +36,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",

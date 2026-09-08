@@ -12,7 +12,9 @@
     "rules": "Rules",
     "import": "Import",
     "suggestions": "Suggestions",
-    "settings": "Settings"
+    "settings": "Settings",
+    "brand": "My Finances",
+    "menu": "Menu"
   },
   "common": {
     "loading": "Loading…",
@@ -104,7 +106,8 @@
     "currencyPlaceholder": "EUR",
     "creating": "Creating…",
     "create": "Create",
-    "failedCreate": "Failed to create account."
+    "failedCreate": "Failed to create account.",
+    "openingAsOf": "{{amount}} as of {{date}}"
   },
   "trends": {
     "title": "Spending Trends",
@@ -300,7 +303,10 @@
     "colExternalId": "Reference column",
     "save": "Save",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "delimTab": "Tab",
+    "dateFormatIso": "ISO (YYYY-MM-DD)",
+    "dateFormatDmy": "DMY (DD.MM.YYYY)"
   },
   "fileDropZone": {
     "placeholder": "Drop a CSV file here or click to browse"

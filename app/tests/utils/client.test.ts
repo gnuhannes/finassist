@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiGet, apiPost } from "../../src/lib/api/client";
+import {
+  ApiError,
+  TimeoutError,
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiRequest,
+} from "../../src/lib/api/client";
 
 describe("ApiError", () => {
   it("is an Error with status and body", () => {
@@ -78,5 +85,59 @@ describe("apiPost", () => {
     const [, init] = vi.mocked(fetch).mock.calls[0];
     expect((init as RequestInit).method).toBe("POST");
     expect((init as RequestInit).body).toBe(JSON.stringify({ name: "test" }));
+  });
+});
+
+describe("apiRequest headers, timeout, delete", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("never sends Content-Type on a bodyless GET, always sends X-Requested-With", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    await apiGet("/api/x");
+    const headers = vi.mocked(fetch).mock.calls[0][1]!.headers as Headers;
+    expect(headers.has("Content-Type")).toBe(false);
+    expect(headers.get("X-Requested-With")).toBe("XMLHttpRequest");
+    expect(headers.get("Accept")).toBe("application/json");
+  });
+
+  it("sets Content-Type for a string body", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    await apiPost("/api/x", { a: 1 });
+    const headers = vi.mocked(fetch).mock.calls[0][1]!.headers as Headers;
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("leaves Content-Type unset for a FormData body", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const fd = new FormData();
+    fd.append("f", "v");
+    await apiRequest("/api/upload", { method: "POST", body: fd });
+    const headers = vi.mocked(fetch).mock.calls[0][1]!.headers as Headers;
+    expect(headers.has("Content-Type")).toBe(false);
+  });
+
+  it("apiDelete issues a DELETE and resolves undefined on empty body", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 200 }));
+    const out = await apiDelete("/api/thing/1");
+    expect(out).toBeUndefined();
+    expect(vi.mocked(fetch).mock.calls[0][1]!.method).toBe("DELETE");
+  });
+
+  it("throws TimeoutError when the request aborts", async () => {
+    vi.mocked(fetch).mockImplementationOnce((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        const signal = (init as RequestInit).signal!;
+        signal.addEventListener("abort", () => {
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    });
+    await expect(apiGet("/api/slow", { timeoutMs: 5 })).rejects.toBeInstanceOf(TimeoutError);
   });
 });
