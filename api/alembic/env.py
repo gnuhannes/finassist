@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
 from alembic import context
+from my_private_finances.config import get_settings
 from my_private_finances.models import (  # noqa: F401
     Account,
     Budget,
@@ -21,9 +21,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-db_url = os.environ.get("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+# Honour the same configuration the app uses (DATA_DIR / DATABASE_URL), so
+# `alembic upgrade head` always targets the database the app will open.
+config.set_main_option("sqlalchemy.url", get_settings().resolved_database_url)
 
 target_metadata = SQLModel.metadata
 

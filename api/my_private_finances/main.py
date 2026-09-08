@@ -10,12 +10,8 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from my_private_finances.api.router import api_router
-from my_private_finances.config import get_data_dir
-from my_private_finances.db import (
-    DEFAULT_DB_PATH,
-    create_engine,
-    create_session_factory,
-)
+from my_private_finances.config import Settings, get_settings
+from my_private_finances.db import create_engine, create_session_factory
 from my_private_finances.logging_config import setup_logging
 from my_private_finances.models.watch_folder_config import WatchSettings
 from my_private_finances.services.watch_folder import watch_folder_task
@@ -28,14 +24,15 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     session_factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+    settings: Settings = app.state.settings
 
-    # Resolve watch root from DB (or use default)
+    # Resolve watch root from DB (or use the configured default)
     root_path: Path
-    default_watch = get_data_dir() / "watch"
+    default_watch = settings.watch_root
     try:
         async with session_factory() as session:
-            settings = await session.get(WatchSettings, 1)
-            root_path = Path(settings.root_path) if settings else default_watch
+            watch_config = await session.get(WatchSettings, 1)
+            root_path = Path(watch_config.root_path) if watch_config else default_watch
     except Exception:
         root_path = default_watch
         logger.warning(
@@ -56,17 +53,23 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Watch folder task stopped")
 
 
-def create_app(db_path: Path = DEFAULT_DB_PATH) -> FastAPI:
-    logger.info("Starting My Private Finances, database: %s", db_path)
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    logger.info(
+        "Starting My Private Finances (data_dir=%s, database=%s)",
+        settings.data_dir,
+        settings.resolved_database_url,
+    )
 
     app = FastAPI(title="My Private Finances", lifespan=_lifespan)
 
-    engine: AsyncEngine = create_engine()
+    engine: AsyncEngine = create_engine(settings.resolved_database_url)
     session_factory: async_sessionmaker[AsyncSession] = create_session_factory(engine)
 
+    app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
-    app.state.db_path = db_path
+    app.state.db_path = settings.sqlite_path
     app.state.restore_lock = asyncio.Lock()
     app.include_router(api_router, prefix="/api")
 
