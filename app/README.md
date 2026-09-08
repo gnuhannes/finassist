@@ -20,7 +20,7 @@ http://localhost:5173
 
 ## Notes
 
-- Use Node.js 20 LTS (see ../.nvmrc)
+- Use Node.js 24 LTS (see ../.nvmrc)
 - If pnpm blocks build scripts, run:
   ```bash
   bashpnpm approve-builds

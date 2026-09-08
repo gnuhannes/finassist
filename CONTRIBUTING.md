@@ -24,7 +24,7 @@ Backend:
 - Poetry
 
 Frontend:
-- Node.js 20 LTS
+- Node.js 24 LTS
 - pnpm (recommended via Corepack or nvm)
 
 A `.nvmrc` file is provided in the repository root.
