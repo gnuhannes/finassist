@@ -32,8 +32,12 @@ typecheck:
 test:
 	pnpm run -s test
 
+.PHONY: test-cov
+test-cov:
+	pnpm run -s test:coverage
+
 .PHONY: ci
-ci: lint typecheck format-check test
+ci: lint typecheck format-check test-cov
 	@echo "✅ app checks passed"
 
 # E2E is deliberately not part of `ci` — it is heavier (boots the backend +

@@ -1,4 +1,4 @@
-import { ApiError } from "./client";
+import { apiRequest } from "./client";
 
 export type ImportErrorDetail = {
   row?: number | null;
@@ -39,16 +39,10 @@ export async function importCsv(params: ImportCsvParams): Promise<ImportResult> 
   if (params.decimalComma !== undefined) query.set("decimal_comma", String(params.decimalComma));
   if (params.profileId !== undefined) query.set("profile_id", String(params.profileId));
 
-  const res = await fetch(`/api/imports/csv?${query}`, {
+  return apiRequest<ImportResult>(`/api/imports/csv?${query}`, {
     method: "POST",
     body: formData,
+    // Parsing + inserting a large CSV can take a while.
+    timeoutMs: 120_000,
   });
-
-  const body = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    throw new ApiError(res.status, body);
-  }
-
-  return body as ImportResult;
 }

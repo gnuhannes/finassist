@@ -12,7 +12,9 @@
     "rules": "Regeln",
     "import": "Importieren",
     "suggestions": "Vorschläge",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "brand": "Meine Finanzen",
+    "menu": "Menü"
   },
   "common": {
     "loading": "Lädt…",
@@ -104,7 +106,8 @@
     "currencyPlaceholder": "EUR",
     "creating": "Wird erstellt…",
     "create": "Erstellen",
-    "failedCreate": "Konto konnte nicht erstellt werden."
+    "failedCreate": "Konto konnte nicht erstellt werden.",
+    "openingAsOf": "{{amount}} zum {{date}}"
   },
   "trends": {
     "title": "Ausgabentrends",
@@ -300,7 +303,10 @@
     "colExternalId": "Referenz-Spalte",
     "save": "Speichern",
     "cancel": "Abbrechen",
-    "delete": "Löschen"
+    "delete": "Löschen",
+    "delimTab": "Tab",
+    "dateFormatIso": "ISO (JJJJ-MM-TT)",
+    "dateFormatDmy": "TMJ (TT.MM.JJJJ)"
   },
   "fileDropZone": {
     "placeholder": "CSV-Datei hier ablegen oder klicken zum Durchsuchen"
