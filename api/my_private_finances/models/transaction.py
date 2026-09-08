@@ -7,6 +7,8 @@ from typing import Optional
 from sqlalchemy import Column, Date, Index, Numeric, String, Text, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from my_private_finances.models.mixins import TimestampMixin
+
 
 class TransactionBase(SQLModel):
     account_id: int = Field(foreign_key="account.id", index=True)
@@ -28,7 +30,7 @@ class TransactionBase(SQLModel):
     import_hash: str = Field(sa_column=Column(String(64), nullable=False))
 
 
-class Transaction(TransactionBase, table=True):
+class Transaction(TimestampMixin, TransactionBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     is_transfer: bool = Field(default=False)
 

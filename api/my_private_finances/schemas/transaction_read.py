@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -24,6 +24,8 @@ class TransactionRead(ReadSchema):
     import_source: Optional[str] = None
     import_hash: str
     is_transfer: bool = False
+
+    created_at: Optional[datetime] = None
 
     @field_serializer("amount")
     def _serialize_amount(self, value: Decimal) -> str:

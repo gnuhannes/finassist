@@ -7,6 +7,8 @@ from typing import Optional
 from sqlalchemy import Column, Date, Numeric, String, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from my_private_finances.models.mixins import TimestampMixin
+
 
 class RecurringPatternBase(SQLModel):
     account_id: int = Field(foreign_key="account.id", index=True)
@@ -21,7 +23,7 @@ class RecurringPatternBase(SQLModel):
     category_id: Optional[int] = Field(default=None, foreign_key="category.id")
 
 
-class RecurringPattern(RecurringPatternBase, table=True):
+class RecurringPattern(TimestampMixin, RecurringPatternBase, table=True):
     __tablename__ = "recurring_pattern"
 
     id: Optional[int] = Field(default=None, primary_key=True)

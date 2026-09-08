@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Optional
 
 from sqlalchemy import Column, Integer, String
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
+
+from my_private_finances.models.mixins import TimestampMixin
 
 
-class CategorizationRule(SQLModel, table=True):
+class CategorizationRule(TimestampMixin, table=True):
     __tablename__ = "categorization_rule"
 
     id: Optional[int] = Field(default=None, primary_key=True)
