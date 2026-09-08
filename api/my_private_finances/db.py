@@ -44,6 +44,21 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
+def sqlite_path_from_engine(engine: AsyncEngine) -> Path:
+    """The on-disk SQLite file backing *engine*.
+
+    Use this instead of a separately-tracked path: export/restore must operate
+    on the file the engine is actually connected to, which is derived from
+    ``DATABASE_URL`` and may differ from ``DEFAULT_DB_PATH``.
+    """
+    url = engine.url
+    if not url.drivername.startswith("sqlite"):
+        raise ValueError(f"Not a SQLite engine: {url.drivername}")
+    if not url.database or url.database == ":memory:":
+        raise ValueError("SQLite engine is not backed by a file")
+    return Path(url.database)
+
+
 async def get_session(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncSession, None]:

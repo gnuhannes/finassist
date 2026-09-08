@@ -67,6 +67,7 @@ def create_app(db_path: Path = DEFAULT_DB_PATH) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.db_path = db_path
+    app.state.restore_lock = asyncio.Lock()
     app.include_router(api_router, prefix="/api")
 
     return app
