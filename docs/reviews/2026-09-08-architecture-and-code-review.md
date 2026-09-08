@@ -6,6 +6,10 @@ Reviewed at `main` @ `91d26ef`. Scope: backend (`api/`, ~4.8k LOC), frontend
 Focus: design, maintainability by a solo human developer, clean-code paradigms,
 security, outdated packages.
 
+**Derived tasks:** milestone
+[*Post-review hardening (2026-09)*](https://github.com/gnuhannes/my-private-finances/milestone/1),
+issues **#96–#116** (mapping in [§5](#5-task-index)).
+
 ## Summary
 
 The codebase is in **good overall health** for a solo project. Layering is
@@ -390,6 +394,41 @@ Healthy — most deps are one patch behind. Majors available but not urgent:
 `eslint` 9→10, `@vitejs/plugin-react` 5→6, `@testing-library/jest-dom` 6→7,
 `@eslint/js` 9→10. **`react-router-dom` 7.13 → 7.18 should be done now** (SEC6).
 Remove `zod` or start using it (A5/C10).
+
+---
+
+## 5. Task Index
+
+Grouped PR-sized units. Milestone: *Post-review hardening (2026-09)*.
+
+| Issue | Task | Findings | Sev |
+|---|---|---|---|
+| [#96](https://github.com/gnuhannes/my-private-finances/issues/96) | Enforce SQLite foreign keys + cascade behaviour | SEC1 | S2 |
+| [#97](https://github.com/gnuhannes/my-private-finances/issues/97) | export/restore wrong DB file; harden restore validation | C11, SEC3, A3 | S2 |
+| [#98](https://github.com/gnuhannes/my-private-finances/issues/98) | Bound CSV upload size and row count | SEC4 | S2 |
+| [#99](https://github.com/gnuhannes/my-private-finances/issues/99) | Confirmation guard + explicit CORS on destructive endpoints | SEC2, SEC5 | S2 |
+| [#100](https://github.com/gnuhannes/my-private-finances/issues/100) | Small API-correctness fixes (PATCH, filters, drift, Decimal, hash) | C7, C8, C9, C12, SEC8 | S1–S3 |
+| [#101](https://github.com/gnuhannes/my-private-finances/issues/101) | Frontend deps: react-router bump, remove unused deps + dead code | SEC6, C10, D1 | S2–S3 |
+| [#102](https://github.com/gnuhannes/my-private-finances/issues/102) | Backend deps: loosen pins, update multipart/fastapi/uvicorn/sqlmodel | D1, SEC7 | S2 |
+| [#103](https://github.com/gnuhannes/my-private-finances/issues/103) | Move blocking work off the event loop | A2 | S2 |
+| [#104](https://github.com/gnuhannes/my-private-finances/issues/104) | Extract services/reporting.py; dedupe filter-building | A1, C4 | S2 |
+| [#105](https://github.com/gnuhannes/my-private-finances/issues/105) | Schema-driven responses: kill _to_read boilerplate | C2, C13 | S2 |
+| [#106](https://github.com/gnuhannes/my-private-finances/issues/106) | Reduce cast(Any).__table__ type escape hatch | C1 | S2 |
+| [#107](https://github.com/gnuhannes/my-private-finances/issues/107) | Typed service exceptions + centralized HTTP status mapping | C5 | S2 |
+| [#108](https://github.com/gnuhannes/my-private-finances/issues/108) | Break up the 275-line csv_import parse function | C6 | S2 |
+| [#109](https://github.com/gnuhannes/my-private-finances/issues/109) | Unify configuration into a Settings object | A3, A6 | S2–S3 |
+| [#110](https://github.com/gnuhannes/my-private-finances/issues/110) | Add created_at/updated_at audit columns | C15 | S3 |
+| [#111](https://github.com/gnuhannes/my-private-finances/issues/111) | Money precision: SQLite Numeric SUM through float | C3 | S2 |
+| [#112](https://github.com/gnuhannes/my-private-finances/issues/112) | FE/BE contract: generate TS types from OpenAPI | A5, C10 | S3 |
+| [#113](https://github.com/gnuhannes/my-private-finances/issues/113) | Frontend cleanups: fetch wrapper, timeouts, i18n leaks | C14 | S3 |
+| [#114](https://github.com/gnuhannes/my-private-finances/issues/114) | Watcher supervision + register /health | A7, C10 | S3 |
+| [#115](https://github.com/gnuhannes/my-private-finances/issues/115) | Document security model + ADR for data-layer design | SEC5, SEC2, A4 | S3 |
+| [#116](https://github.com/gnuhannes/my-private-finances/issues/116) | Raise frontend test coverage | C14 | S3 |
+
+Suggested order: **#96, #97, #100, #101, #98** (quick wins / correctness /
+security) → **#102, #111, #103, #109** (deps + data correctness + config) →
+**#104, #105, #106, #107, #108** (backend structure) → **#112, #113, #99, #114,
+#110, #115, #116** (contracts, polish, docs).
 
 ---
 
