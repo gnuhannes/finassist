@@ -1,6 +1,15 @@
 from pathlib import Path
 
+import pytest
+
 from my_private_finances.config import Settings
+
+
+@pytest.fixture(autouse=True)
+def _clear_config_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Start each test from a clean environment (CI sets DATABASE_URL)."""
+    monkeypatch.delenv("DATA_DIR", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
 
 
 def test_defaults_hang_off_data_dir() -> None:
@@ -26,7 +35,7 @@ def test_database_url_overrides_only_the_database() -> None:
     assert settings.watch_root == Path("/srv/mpf/watch")
 
 
-def test_reads_from_environment(monkeypatch) -> None:
+def test_reads_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATA_DIR", "/from/env")
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///custom.sqlite")
 

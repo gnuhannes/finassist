@@ -13,9 +13,16 @@ from my_private_finances.main import create_app
 
 
 def _test_settings(tmpdir: str) -> Settings:
-    # data_dir alone; the SQLite path is derived from it, so app.state.db_path
-    # and the engine's file always agree (see export/restore).
-    return Settings(data_dir=Path(tmpdir))
+    # Pin both data_dir and database_url so an ambient DATABASE_URL in the
+    # environment (CI sets one) can't leak a shared DB into the tests. The URL
+    # points at the same file Settings.sqlite_path derives, so app.state.db_path
+    # and the engine agree (see export/restore).
+    tmp = Path(tmpdir)
+    db_file = tmp / "my_private_finances.sqlite"
+    return Settings(
+        data_dir=tmp,
+        database_url=f"sqlite+aiosqlite:///{db_file.as_posix()}",
+    )
 
 
 @pytest_asyncio.fixture
