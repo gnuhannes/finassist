@@ -28,6 +28,10 @@ async def create_transaction(
 ) -> TransactionRead:
     await get_account_or_404(session, tx.account_id)
 
+    if tx.category_id is not None:
+        if await session.get(Category, tx.category_id) is None:
+            raise HTTPException(status_code=422, detail="Category not found")
+
     import_hash = compute_import_hash(
         HashInput(
             account_id=tx.account_id,

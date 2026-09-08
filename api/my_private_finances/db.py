@@ -4,6 +4,7 @@ import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -34,10 +35,25 @@ def ensure_sqlite_dir(database_url: str) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _enable_sqlite_foreign_keys(engine: AsyncEngine) -> None:
+    """SQLite does not enforce foreign keys unless `PRAGMA foreign_keys=ON` is
+    issued per connection. Attach it to the underlying sync engine's connect
+    event so every pooled connection (including aiosqlite's) has it set."""
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_pragma(dbapi_connection: object, _connection_record: object) -> None:
+        cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
 def create_engine(database_url: str | None = None) -> AsyncEngine:
     url = database_url or get_database_url()
     ensure_sqlite_dir(url)
-    return create_async_engine(url, echo=False, future=True)
+    engine = create_async_engine(url, echo=False, future=True)
+    if url.startswith("sqlite"):
+        _enable_sqlite_foreign_keys(engine)
+    return engine
 
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
