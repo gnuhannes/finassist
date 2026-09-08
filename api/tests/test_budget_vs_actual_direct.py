@@ -4,35 +4,37 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from my_private_finances.api.routes.reports import _parse_month, get_budget_vs_actual
 from my_private_finances.models import Account, Budget, Category, Transaction
+from my_private_finances.services.reporting import (
+    AccountNotFound,
+    InvalidMonth,
+    budget_vs_actual,
+    parse_month,
+)
 
 
 def test_parse_month_valid() -> None:
-    start, end = _parse_month("2026-05")
+    start, end = parse_month("2026-05")
     assert start == date(2026, 5, 1)
     assert end == date(2026, 6, 1)
 
 
 def test_parse_month_december() -> None:
-    start, end = _parse_month("2026-12")
+    start, end = parse_month("2026-12")
     assert start == date(2026, 12, 1)
     assert end == date(2027, 1, 1)
 
 
 def test_parse_month_invalid_format() -> None:
-    with pytest.raises(HTTPException) as exc_info:
-        _parse_month("bad")
-    assert exc_info.value.status_code == 422
+    with pytest.raises(InvalidMonth):
+        parse_month("bad")
 
 
 def test_parse_month_invalid_month_number() -> None:
-    with pytest.raises(HTTPException) as exc_info:
-        _parse_month("2026-13")
-    assert exc_info.value.status_code == 422
+    with pytest.raises(InvalidMonth):
+        parse_month("2026-13")
 
 
 @pytest.mark.asyncio
@@ -64,10 +66,10 @@ async def test_budget_vs_actual_direct(db_session: AsyncSession) -> None:
     db_session.add(tx)
     await db_session.commit()
 
-    result = await get_budget_vs_actual(
-        account_id=acc.id,
+    result = await budget_vs_actual(
+        db_session,
         month="2026-05",
-        session=db_session,  # type: ignore[arg-type]
+        account_id=acc.id,
     )
 
     assert len(result) == 1
@@ -79,8 +81,5 @@ async def test_budget_vs_actual_direct(db_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_budget_vs_actual_account_not_found(db_session: AsyncSession) -> None:
-    with pytest.raises(HTTPException) as exc_info:
-        await get_budget_vs_actual(
-            account_id=99999, month="2026-05", session=db_session
-        )
-    assert exc_info.value.status_code == 404
+    with pytest.raises(AccountNotFound):
+        await budget_vs_actual(db_session, month="2026-05", account_id=99999)
