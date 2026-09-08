@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, cast
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Query
@@ -16,6 +16,7 @@ from my_private_finances.services.transfer_detection import (
     detect_transfer_candidates,
     dismiss_transfer,
 )
+from my_private_finances.utils.sql import table
 
 router = APIRouter(prefix="/transfers", tags=["transfers"])
 
@@ -100,7 +101,7 @@ async def trigger_detection(
     await session.commit()
 
     # Reload with IDs after commit
-    tc = cast(Any, TransferCandidate).__table__
+    tc = table(TransferCandidate)
     stmt = (
         select(tc)
         .where(tc.c.status == "pending")
@@ -121,7 +122,7 @@ async def list_candidates(
     status: Annotated[str | None, Query()] = None,
 ) -> list[TransferCandidateRead]:
     """List transfer candidates. Defaults to pending if no status filter given."""
-    tc = cast(Any, TransferCandidate).__table__
+    tc = table(TransferCandidate)
     stmt = select(tc)
     filter_status = status if status is not None else "pending"
     stmt = stmt.where(tc.c.status == filter_status).order_by(tc.c.id)

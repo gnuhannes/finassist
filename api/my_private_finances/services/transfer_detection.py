@@ -13,7 +13,6 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from my_private_finances.models import Account, Transaction
 from my_private_finances.models.transfer_candidate import TransferCandidate
 from my_private_finances.utils.money import money_from_db
+from my_private_finances.utils.sql import table
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ async def detect_transfer_candidates(
     Skips pairs that are already in TransferCandidate (any status).
     Returns newly created TransferCandidate rows (status='pending').
     """
-    tx = cast(Any, Transaction).__table__
-    acc = cast(Any, Account).__table__
+    tx = table(Transaction)
+    acc = table(Account)
 
     # Load all transactions with account info
     stmt = (
@@ -61,7 +61,7 @@ async def detect_transfer_candidates(
     incoming = [r for r in rows if r.amount > 0]
 
     # Load already-tracked pairs to avoid duplicates
-    tc = cast(Any, TransferCandidate).__table__
+    tc = table(TransferCandidate)
     existing_stmt = select(tc.c.from_transaction_id, tc.c.to_transaction_id)
     existing_rows = (await session.execute(existing_stmt)).all()
     existing_pairs: set[tuple[int, int]] = {

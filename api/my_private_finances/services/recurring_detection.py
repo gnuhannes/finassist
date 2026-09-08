@@ -6,13 +6,13 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from my_private_finances.models import RecurringPattern, Transaction
 from my_private_finances.utils.money import money_from_db
+from my_private_finances.utils.sql import table
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ async def fetch_transaction_groups(
     account_id: int,
 ) -> dict[str, list[tuple[date, Decimal, int | None]]]:
     """Fetch and group expense transactions by normalized payee."""
-    tx = cast(Any, Transaction).__table__
+    tx = table(Transaction)
 
     stmt = (
         select(

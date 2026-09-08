@@ -12,7 +12,7 @@ from __future__ import annotations
 import calendar
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from sqlalchemy import ColumnElement, and_, case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +36,7 @@ from my_private_finances.schemas import (
     TopSpending,
 )
 from my_private_finances.utils.money import money_from_db
+from my_private_finances.utils.sql import table
 
 _ZERO = Decimal("0")
 _CENTS = Decimal("0.01")
@@ -60,9 +61,9 @@ class AccountNotFound(ReportError):
 # Shared helpers
 # --------------------------------------------------------------------------- #
 
-_TX = cast(Any, Transaction).__table__
-_CAT = cast(Any, Category).__table__
-_BUDGET = cast(Any, Budget).__table__
+_TX = table(Transaction)
+_CAT = table(Category)
+_BUDGET = table(Budget)
 
 
 def parse_month(value: str) -> tuple[date, date]:
