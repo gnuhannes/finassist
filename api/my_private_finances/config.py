@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     database_url: str | None = None
     log_level: str = "INFO"
 
+    # Browser origins allowed to call the API. Localhost-only by default; the
+    # PWA/LAN roadmap (feature 130) must widen this *and* add auth (see #99).
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
     @property
     def sqlite_path(self) -> Path:
         return self.data_dir / "my_private_finances.sqlite"

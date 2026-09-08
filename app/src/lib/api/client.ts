@@ -9,9 +9,18 @@ export class ApiError extends Error {
   }
 }
 
+// Sent on every request. The backend's destructive endpoints require it (#99):
+// a cross-origin simple request can't set it without a CORS preflight, which
+// the origin allow-list blocks for unknown origins.
+const DEFAULT_HEADERS = {
+  Accept: "application/json",
+  "Content-Type": "application/json",
+  "X-Requested-With": "XMLHttpRequest",
+};
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: DEFAULT_HEADERS,
     ...init,
   });
   const body = await res.json().catch(() => null);
@@ -40,7 +49,10 @@ export async function apiPatch<T>(path: string, data: unknown): Promise<T> {
 }
 
 export async function apiDelete(path: string): Promise<void> {
-  const res = await fetch(path, { method: "DELETE" });
+  const res = await fetch(path, {
+    method: "DELETE",
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new ApiError(res.status, body);

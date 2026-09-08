@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -16,7 +17,10 @@ from my_private_finances.db import create_engine, create_session_factory
 from my_private_finances.logging_config import setup_logging
 from my_private_finances.models.watch_folder_config import WatchSettings
 from my_private_finances.services.exceptions import ServiceError
-from my_private_finances.services.watch_folder import watch_folder_task
+from my_private_finances.services.watch_folder import (
+    WatcherStatus,
+    watch_folder_supervisor,
+)
 
 setup_logging()
 
@@ -41,9 +45,12 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Could not read watch settings from DB, using default", exc_info=True
         )
 
-    task = asyncio.create_task(watch_folder_task(session_factory, root_path))
+    status: WatcherStatus = app.state.watcher_status
+    task = asyncio.create_task(
+        watch_folder_supervisor(session_factory, root_path, status)
+    )
     app.state.watcher_task = task
-    logger.info("Watch folder task started")
+    logger.info("Watch folder supervisor started")
 
     yield
 
@@ -65,6 +72,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="My Private Finances", lifespan=_lifespan)
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     @app.exception_handler(ServiceError)
     async def _service_error_handler(
         request: Request, exc: ServiceError
@@ -79,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = session_factory
     app.state.db_path = settings.sqlite_path
     app.state.restore_lock = asyncio.Lock()
+    app.state.watcher_status = WatcherStatus()
     app.include_router(api_router, prefix="/api")
 
     return app

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from sqlalchemy import event
@@ -61,10 +60,3 @@ def sqlite_path_from_engine(engine: AsyncEngine) -> Path:
     if not url.database or url.database == ":memory:":
         raise ValueError("SQLite engine is not backed by a file")
     return Path(url.database)
-
-
-async def get_session(
-    session_factory: async_sessionmaker[AsyncSession],
-) -> AsyncGenerator[AsyncSession, None]:
-    async with session_factory() as session:
-        yield session

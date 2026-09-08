@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -19,6 +20,17 @@ from my_private_finances.services.csv_import import import_transactions_from_csv
 from my_private_finances.services.recurring_detection import run_detection
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WatcherStatus:
+    """Live status of the watch-folder background task (exposed by /health)."""
+
+    running: bool = False
+    last_error: str | None = None
+    restarts: int = 0
+    files_processed: int = 0
+    root_path: str | None = None
 
 
 class _QueueHandler(FileSystemEventHandler):
@@ -142,6 +154,7 @@ def _move_to_failed(path: Path, failed_dir: Path, error: str) -> None:
 async def watch_folder_task(
     session_factory: async_sessionmaker[AsyncSession],
     watch_path: Path,
+    status: WatcherStatus | None = None,
 ) -> None:
     """Long-running asyncio task that watches *watch_path* and auto-imports files."""
     watch_path.mkdir(parents=True, exist_ok=True)
@@ -161,8 +174,50 @@ async def watch_folder_task(
             if not path.exists():
                 continue
             await _process_file(path, session_factory)
+            if status is not None:
+                status.files_processed += 1
     except asyncio.CancelledError:
         logger.info("Watch folder task cancelled, stopping observer")
         observer.stop()
         observer.join()
         raise
+    except BaseException:
+        observer.stop()
+        observer.join()
+        raise
+
+
+async def watch_folder_supervisor(
+    session_factory: async_sessionmaker[AsyncSession],
+    watch_path: Path,
+    status: WatcherStatus,
+    *,
+    max_backoff: float = 60.0,
+) -> None:
+    """Run :func:`watch_folder_task`, relaunching it after an unexpected crash
+    with exponential backoff (A7). Cancellation stops the supervisor.
+    """
+    status.root_path = str(watch_path)
+    backoff = min(1.0, max_backoff)
+    while True:
+        try:
+            status.running = True
+            await watch_folder_task(session_factory, watch_path, status)
+            status.running = False
+            logger.info("watch_folder_task returned; supervisor stopping")
+            return
+        except asyncio.CancelledError:
+            status.running = False
+            raise
+        except Exception as exc:
+            status.running = False
+            status.last_error = repr(exc)
+            status.restarts += 1
+            logger.error(
+                "watch_folder_task crashed (restart #%d), retrying in %.0fs",
+                status.restarts,
+                backoff,
+                exc_info=True,
+            )
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, max_backoff)
