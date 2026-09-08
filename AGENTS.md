@@ -123,7 +123,9 @@ clients; hooks import from `../lib/api/<module>` directly.
   flake8. Third-party missing-stub handling goes in `[[tool.mypy.overrides]]`, not
   inline `# type: ignore[import-untyped]`.
 - Backend: Poetry (venv at `api/.venv`). Frontend: pnpm. Node **24** (`.nvmrc`).
-- Coverage gate is **75%** (`MIN_COVERAGE`), not ECC's 80%.
+- Backend coverage gate is **`MIN_COVERAGE` in `api/Makefile`** (currently 76%),
+  ratcheting toward ECC's 80% target. Never lower it; raise it when coverage
+  climbs. New code should land with tests.
 - There is **no E2E / Playwright layer** — tests are pytest (backend) and vitest
   (frontend) only.
 - Linter/formatter config files are fixed; fix the code, not the config.
