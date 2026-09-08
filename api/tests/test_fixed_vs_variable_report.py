@@ -6,11 +6,10 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from my_private_finances.api.routes.reports import get_fixed_vs_variable
 from my_private_finances.models import Account, Category, Transaction
+from my_private_finances.services.reporting import AccountNotFound, fixed_vs_variable
 
 
 async def _seed(session: AsyncSession) -> tuple[Account, Category, Category, Category]:
@@ -64,10 +63,10 @@ async def test_fixed_vs_variable_basic(db_session: AsyncSession) -> None:
     )
     await db_session.commit()
 
-    result = await get_fixed_vs_variable(
-        account_id=acc.id,
+    result = await fixed_vs_variable(
+        db_session,
         month="2026-05",
-        session=db_session,  # type: ignore[arg-type]
+        account_id=acc.id,
     )
 
     assert result.account_id == acc.id
@@ -82,10 +81,10 @@ async def test_fixed_vs_variable_basic(db_session: AsyncSession) -> None:
 async def test_fixed_vs_variable_no_expenses(db_session: AsyncSession) -> None:
     acc, _, _, _ = await _seed(db_session)
 
-    result = await get_fixed_vs_variable(
-        account_id=acc.id,
+    result = await fixed_vs_variable(
+        db_session,
         month="2026-05",
-        session=db_session,  # type: ignore[arg-type]
+        account_id=acc.id,
     )
 
     assert result.fixed_total == Decimal("0")
@@ -106,10 +105,10 @@ async def test_fixed_vs_variable_ignores_income(db_session: AsyncSession) -> Non
     )
     await db_session.commit()
 
-    result = await get_fixed_vs_variable(
-        account_id=acc.id,
+    result = await fixed_vs_variable(
+        db_session,
         month="2026-05",
-        session=db_session,  # type: ignore[arg-type]
+        account_id=acc.id,
     )
 
     assert result.fixed_total == Decimal("500.00")
@@ -117,8 +116,5 @@ async def test_fixed_vs_variable_ignores_income(db_session: AsyncSession) -> Non
 
 @pytest.mark.asyncio
 async def test_fixed_vs_variable_account_not_found(db_session: AsyncSession) -> None:
-    with pytest.raises(HTTPException) as exc_info:
-        await get_fixed_vs_variable(
-            account_id=99999, month="2026-05", session=db_session
-        )
-    assert exc_info.value.status_code == 404
+    with pytest.raises(AccountNotFound):
+        await fixed_vs_variable(db_session, month="2026-05", account_id=99999)

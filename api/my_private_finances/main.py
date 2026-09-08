@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from my_private_finances.api.router import api_router
@@ -14,6 +15,7 @@ from my_private_finances.config import Settings, get_settings
 from my_private_finances.db import create_engine, create_session_factory
 from my_private_finances.logging_config import setup_logging
 from my_private_finances.models.watch_folder_config import WatchSettings
+from my_private_finances.services.reporting import ReportError
 from my_private_finances.services.watch_folder import watch_folder_task
 
 setup_logging()
@@ -62,6 +64,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app = FastAPI(title="My Private Finances", lifespan=_lifespan)
+
+    @app.exception_handler(ReportError)
+    async def _report_error_handler(request: Request, exc: ReportError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
 
     engine: AsyncEngine = create_engine(settings.resolved_database_url)
     session_factory: async_sessionmaker[AsyncSession] = create_session_factory(engine)
