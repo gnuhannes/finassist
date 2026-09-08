@@ -1,176 +1,126 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Project-specific guidance for AI coding agents (Claude Code, Codex) working on
+**My Private Finances**.
 
-## Philosophy and Methodology
+Generic engineering practice — TDD, conventional commits, security checklists,
+code-quality review, agent orchestration — comes from ECC (Everything Claude
+Code) and its skills. This file only records what is specific to this repository.
+**When ECC guidance and this file disagree, this file wins.**
 
-### Foundational Philosophy
+> `AGENTS.md` is the single instruction file for this repo. `CLAUDE.md` is
+> intentionally git-ignored — do not create one; Claude Code reads `AGENTS.md`.
 
-- Do the right thing because it’s the right thing
-- Leave it better than when you found it
-- Coding is an art form; go make art
+## Non-negotiable constraints
 
-### Development Methodology
+- **Local-first, privacy by design.** No cloud, no telemetry, no analytics, no
+  third-party APIs, no outbound network requests at runtime. All data stays in a
+  local SQLite database.
+- A new runtime dependency that phones home, or any network call added to `api/`
+  or `app/` runtime code, is a design violation — stop and flag it.
+- Core flow: bank statement → CSV import → visualization → insights.
 
-- Measure twice and cut once — if you are unsure, confirm before proceeding
-- Smart code is better than clever code — prioritize clarity and maintainability
-- Start simple, add complexity only when needed
-- One change at a time — explain your reasoning
+## Layout
 
-### AI-Specific Constraints
+Monorepo:
 
-- When in doubt, ask — don’t assume
-- Respect existing patterns before suggesting new ones
-- Working software beats perfect documentation
-- Use the established tech stack unless there’s a compelling reason to change
-
-### Session Hygiene
-
-- Clean up after yourself — remove scripts and artifacts that are no longer necessary
-- Turn off the lights when leaving a room — close connections, shut down servers, leave the environment ready for the
-  next developer
-
-## Project Overview
-
-**My Private Finances** — a local-first, privacy-by-design personal finance app. No cloud, no telemetry, no external
-APIs. All data stays in a local SQLite database.
-
-Core flow: bank statement → CSV import → visualization → insights.
-
-## Repository Structure
-
-Monorepo with two main packages:
-
-- `api/` — Python backend (FastAPI + SQLModel + SQLite)
-- `app/` — React frontend (Vite + TypeScript + React Query)
-- `docs/adr/` — Architecture Decision Records
+- `api/` — Python backend (FastAPI + SQLModel + SQLite, fully async)
+- `app/` — React frontend (Vite + TypeScript + React 19 + TanStack Query)
+- `docs/adr/` — Architecture Decision Records (read before changing architecture)
+- `docs/product/` — vision, roadmap, and per-feature specs
 
 ## Commands
 
-All commands run from the repo root via Makefiles.
-
-### Full CI (runs both backend and frontend)
+All targets run from the repo root via Makefiles.
 
 ```
-make ci
+make ci               # full backend + frontend CI
+make sync             # install backend (poetry) + frontend (pnpm) deps
 ```
 
-### Backend (api/)
+Backend (`api/`):
 
 ```
-make lint            # ruff check + format check
-make lint-fix        # ruff auto-fix + format (from api/ directory: make -C api lint-fix)
-make typecheck       # mypy
-make test            # pytest
-make test-cov        # pytest with coverage report
-make coverage        # pytest with 75% minimum coverage gate
-make migrate         # alembic upgrade head
-make check-migrations # detect schema drift via autogenerate
+make lint             # ruff check + ruff format --check
+make lint-fix         # ruff --fix + ruff format
+make typecheck        # mypy
+make test             # pytest
+make test-cov         # pytest + coverage report (no gate)
+make coverage         # pytest, fails under MIN_COVERAGE (default 75)
+make migrate          # alembic upgrade head
+make check-migrations # fail if alembic autogenerate detects schema drift
+cd api && poetry run pytest tests/path/to/test_file.py::test_name -v   # single test
 ```
 
-Run a single backend test:
+Frontend (`app/`):
 
 ```
-cd api && poetry run pytest tests/path/to/test_file.py::test_name -v
+make fe-lint          # eslint
+make fe-typecheck     # tsc --noEmit
+make fe-format-check  # prettier --check
+make fe-test          # vitest run
+cd app && pnpm run test -- tests/path/to/file.test.ts                  # single test
 ```
 
-### Frontend (app/)
+Dev servers:
 
 ```
-make fe-lint         # eslint
-make fe-typecheck    # tsc
-make fe-format-check # prettier check
-make fe-test         # vitest
+make -C api run       # uvicorn on port 5179
+make -C app run       # vite dev on port 5173 (proxies /api → 127.0.0.1:5179)
 ```
 
-Run a single frontend test:
+## Backend conventions (`api/my_private_finances/`)
+
+Module map: `main.py` app factory · `db.py` async engine/session · `deps.py`
+DI (provides `AsyncSession`) · `models/` SQLModel domain models · `schemas/`
+Pydantic request/response · `services/` business logic · `api/router.py`
+aggregates `api/routes/` · `cli/` CSV import tools.
+
+- **Async everywhere** — `AsyncSession`, `aiosqlite`. Never call sync/blocking
+  I/O from a route.
+- **Money is `Decimal`, never `float`.**
+- `Transaction(account_id, import_hash)` is UNIQUE — this is the import dedup
+  key. `import_hash` is a SHA256 computed in `services/transaction_hash.py`.
+- Tests build the schema with `SQLModel.metadata.create_all`, **not** Alembic.
+- `Transaction.booking_date` must be a `date` object (not a string) when a row is
+  constructed directly in a test.
+- pytest runs with `asyncio_mode=auto`.
+
+## Database & migrations
+
+- SQLite at `data/my_private_finances.sqlite` (gitignored). CI uses a separate
+  DB at `api/.ci/my_private_finances.sqlite`.
+- Alembic migrations live in `api/alembic/versions/`; see `docs/migrations.md`.
+- After any model change: `cd api && poetry run alembic revision --autogenerate
+  -m "description"`, review the file, and commit it. `make check-migrations`
+  gates schema drift in CI.
+- Autogenerate emits `sqlmodel.sql.sqltypes.AutoString()` — replace it with
+  `sa.String()` in the migration (otherwise ruff F821).
+
+## Frontend conventions (`app/src/`)
+
+Layered architecture; dependency direction is enforced by ESLint
+`import/no-restricted-paths`:
 
 ```
-cd app && pnpm run test -- tests/path/to/test_file.test.ts
+pages/       → orchestration (may import from any layer below)
+components/  → reusable UI          hooks/ → TanStack Query wrappers
+lib/api/     → fetch wrapper + API client functions (no React imports)
+domain/      → DTO mappers + pure domain logic     utils/ → pure helpers
 ```
 
-### Dev Servers
+Never import upward. `lib/api.ts` is a barrel that re-exports the per-module
+clients; hooks import from `../lib/api/<module>` directly.
 
-```
-make -C api run      # uvicorn on port 5179
-make -C app run      # vite dev on port 5173 (proxies /api to backend)
-```
+- TanStack Query for server state · CSS Modules for styling · Recharts for
+  charts · Zod for schema validation · i18next for copy.
+- API base path is `/api/`.
 
-### Dependency Installation
+## Tooling — where ECC defaults do not apply
 
-```
-make sync            # install backend (poetry) + frontend (pnpm) deps
-```
-
-## Architecture
-
-### Backend (`api/my_private_finances/`)
-
-- `main.py` — FastAPI app factory
-- `db.py` — async SQLAlchemy engine + session creation
-- `deps.py` — FastAPI dependency injection (provides AsyncSession)
-- `models/` — SQLModel domain models (Account, Transaction, Category)
-- `schemas/` — Pydantic request/response schemas
-- `services/` — business logic (CSV import, transaction hashing)
-- `api/router.py` — aggregates all route modules
-- `api/routes/` — endpoint handlers
-- `cli/` — CLI tools (CSV import)
-
-Key conventions:
-
-- Async everywhere (AsyncSession, aiosqlite)
-- `Transaction(account_id, import_hash)` is UNIQUE for dedup
-- `import_hash` is SHA256, computed in `services/transaction_hash.py`
-- Tests use `SQLModel.metadata.create_all` (NOT Alembic) for schema setup
-- Decimal type for money amounts (never floats)
-
-### Frontend (`app/src/`)
-
-Layered architecture (enforced by ESLint `import/no-restricted-paths`):
-
-```
-pages/       → orchestration (can import from all layers below)
-components/  → reusable UI components
-hooks/       → React Query wrappers (useAccounts, useMonthlyReport)
-lib/api/     → fetch wrapper + API client functions (NO React imports)
-domain/      → DTO mappers + domain logic (pure functions)
-utils/       → pure helper functions (e.g., formatCurrency)
-```
-
-Dependency direction: pages → components/hooks → lib → domain → utils. Never import upward.
-
-Key conventions:
-
-- React Query (TanStack) for server state
-- CSS Modules for component styling
-- Recharts for data visualization
-- Zod for schema validation
-
-### Frontend-Backend Connection
-
-- Vite dev proxy: `/api` → `http://127.0.0.1:5179`
-- API base path: `/api/`
-
-## Database
-
-- SQLite at `data/my_private_finances.sqlite` (local, gitignored)
-- Migrations: Alembic (`api/alembic/versions/`)
-- CI uses separate DB at `api/.ci/my_private_finances.sqlite`
-- After model changes, create a migration: `cd api && poetry run alembic revision --autogenerate -m "description"`
-
-## Code Quality Tools
-
-| Tool     | Scope    | Purpose                     |
-|----------|----------|-----------------------------|
-| Ruff     | Backend  | Linting + formatting        |
-| MyPy     | Backend  | Type checking               |
-| ESLint   | Frontend | Linting + import rules      |
-| Prettier | Frontend | Formatting                  |
-| Vitest   | Frontend | Testing                     |
-| Pytest   | Backend  | Testing (asyncio_mode=auto) |
-
-## Package Managers
-
-- Backend: Poetry (`api/pyproject.toml`, venv at `api/.venv`)
-- Frontend: pnpm (`app/package.json`)
-- Node version: 20.x (`.nvmrc`)
+- **Ruff only** for Python lint + format. Do **not** add black, isort, or flake8.
+- Backend: Poetry (venv at `api/.venv`). Frontend: pnpm. Node **24** (`.nvmrc`).
+- Coverage gate is **75%** (`MIN_COVERAGE`), not ECC's 80%.
+- There is **no E2E / Playwright layer** — tests are pytest (backend) and vitest
+  (frontend) only.
+- Linter/formatter config files are fixed; fix the code, not the config.
