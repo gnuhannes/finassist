@@ -6,7 +6,7 @@ from typing import Annotated, Any, Optional, cast
 
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Query
-from sqlalchemy import func, literal, select, case
+from sqlalchemy import case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from my_private_finances.deps import SessionDep

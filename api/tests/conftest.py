@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlmodel import SQLModel
 

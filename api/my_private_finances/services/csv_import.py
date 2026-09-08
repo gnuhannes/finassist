@@ -17,7 +17,7 @@ from my_private_finances.services.categorization import (
     load_rules_ordered,
     match_transaction,
 )
-from my_private_finances.services.transaction_hash import compute_import_hash, HashInput
+from my_private_finances.services.transaction_hash import HashInput, compute_import_hash
 
 logger = logging.getLogger(__name__)
 

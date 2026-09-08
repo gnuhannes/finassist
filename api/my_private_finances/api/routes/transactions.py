@@ -1,22 +1,21 @@
 from datetime import date
 from decimal import Decimal
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Query
-from typing import Annotated, Any, Optional
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
-from my_private_finances.models import Transaction, Category
+from my_private_finances.deps import SessionDep
+from my_private_finances.models import Category, Transaction
 from my_private_finances.schemas import (
-    TransactionRead,
     TransactionCreate,
     TransactionListResponse,
+    TransactionRead,
     TransactionUpdate,
 )
-
-from my_private_finances.deps import SessionDep
-from my_private_finances.services.transaction_hash import compute_import_hash, HashInput
+from my_private_finances.services.transaction_hash import HashInput, compute_import_hash
 from my_private_finances.utils.db_helpers import get_account_or_404
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile
+
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import CsvProfile
 from my_private_finances.schemas import ImportResultResponse

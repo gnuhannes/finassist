@@ -9,13 +9,13 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from my_private_finances.api.router import api_router
 from my_private_finances.config import get_data_dir
 from my_private_finances.db import (
     DEFAULT_DB_PATH,
     create_engine,
     create_session_factory,
 )
-from my_private_finances.api.router import api_router
 from my_private_finances.logging_config import setup_logging
 from my_private_finances.models.watch_folder_config import WatchSettings
 from my_private_finances.services.watch_folder import watch_folder_task

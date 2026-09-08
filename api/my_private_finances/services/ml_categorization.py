@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import joblib  # type: ignore[import-untyped]
-from sklearn.calibration import CalibratedClassifierCV  # type: ignore[import-untyped]
-from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
-from sklearn.pipeline import Pipeline  # type: ignore[import-untyped]
-from sklearn.svm import LinearSVC  # type: ignore[import-untyped]
+import joblib
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import Pipeline
+from sklearn.svm import LinearSVC
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 

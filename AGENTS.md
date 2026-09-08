@@ -118,7 +118,10 @@ clients; hooks import from `../lib/api/<module>` directly.
 
 ## Tooling — where ECC defaults do not apply
 
-- **Ruff only** for Python lint + format. Do **not** add black, isort, or flake8.
+- **Ruff is the sole Python linter and formatter** (config in `api/pyproject.toml`:
+  `line-length` 88, import sorting via lint rule `I`). Do not add black, isort, or
+  flake8. Third-party missing-stub handling goes in `[[tool.mypy.overrides]]`, not
+  inline `# type: ignore[import-untyped]`.
 - Backend: Poetry (venv at `api/.venv`). Frontend: pnpm. Node **24** (`.nvmrc`).
 - Coverage gate is **75%** (`MIN_COVERAGE`), not ECC's 80%.
 - There is **no E2E / Playwright layer** — tests are pytest (backend) and vitest

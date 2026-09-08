@@ -7,7 +7,10 @@ from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from watchdog.events import FileCreatedEvent, FileSystemEventHandler  # type: ignore[import-untyped]
+from watchdog.events import (  # type: ignore[import-untyped]
+    FileCreatedEvent,
+    FileSystemEventHandler,
+)
 from watchdog.observers import Observer  # type: ignore[import-untyped]
 
 from my_private_finances.models import CsvProfile
