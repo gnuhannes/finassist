@@ -7,23 +7,29 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlmodel import SQLModel
 
+from my_private_finances.config import Settings
 from my_private_finances.db import create_engine, create_session_factory
 from my_private_finances.main import create_app
+
+
+def _test_settings(tmpdir: str) -> Settings:
+    # Pin both data_dir and database_url so an ambient DATABASE_URL in the
+    # environment (CI sets one) can't leak a shared DB into the tests. The URL
+    # points at the same file Settings.sqlite_path derives, so app.state.db_path
+    # and the engine agree (see export/restore).
+    tmp = Path(tmpdir)
+    db_file = tmp / "my_private_finances.sqlite"
+    return Settings(
+        data_dir=tmp,
+        database_url=f"sqlite+aiosqlite:///{db_file.as_posix()}",
+    )
 
 
 @pytest_asyncio.fixture
 async def test_app() -> AsyncGenerator[AsyncClient, None]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test.sqlite"
-        database_url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-
-        app = create_app()
-
-        engine: AsyncEngine = create_engine(database_url)
-        session_factory = create_session_factory(engine)
-        app.state.engine = engine
-        app.state.session_factory = session_factory
-        app.state.db_path = db_path
+        app = create_app(_test_settings(tmpdir))
+        engine: AsyncEngine = app.state.engine
 
         async with engine.connect() as conn:
             async with conn.begin():
@@ -39,10 +45,9 @@ async def test_app() -> AsyncGenerator[AsyncClient, None]:
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test.sqlite"
-        database_url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
-
-        engine: AsyncEngine = create_engine(database_url)
+        engine: AsyncEngine = create_engine(
+            _test_settings(tmpdir).resolved_database_url
+        )
         session_factory = create_session_factory(engine)
 
         async with engine.connect() as conn:

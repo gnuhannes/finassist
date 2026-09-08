@@ -56,4 +56,6 @@ CI can override the database via `DATABASE_URL` (SQLite URL), e.g.:
 DATABASE_URL=sqlite+aiosqlite:///.../api/.ci/my_private_finances.sqlite
 ```
 
-Alembic respects `DATABASE_URL` if set; otherwise it uses the default from `alembic.ini`.
+Alembic uses the same configuration as the app (`my_private_finances.config.Settings`):
+`DATABASE_URL` if set, otherwise a SQLite file under `DATA_DIR` (default `data/`). The
+`sqlalchemy.url` in `alembic.ini` is only a placeholder and is always overridden at runtime.

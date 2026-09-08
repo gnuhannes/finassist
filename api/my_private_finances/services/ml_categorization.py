@@ -13,7 +13,7 @@ from sklearn.svm import LinearSVC
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from my_private_finances.config import get_data_dir
+from my_private_finances.config import get_settings
 from my_private_finances.models import Category, Transaction
 from my_private_finances.schemas.ml import Suggestion, TrainResult
 
@@ -27,7 +27,7 @@ class ColdStartError(Exception):
 
 
 def _model_path() -> Path:
-    return get_data_dir() / "ml_model.joblib"
+    return get_settings().ml_model_path
 
 
 def _feature_text(tx: Transaction) -> str:
