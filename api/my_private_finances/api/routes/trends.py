@@ -8,11 +8,11 @@ from typing import Annotated, Any, Optional, cast
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from my_private_finances.utils.money import money_from_db
 from my_private_finances.api.routes.reports import _parse_month, _resolve_currency
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Category, Transaction
 from my_private_finances.schemas import CategoryTrendItem, SpendingTrendReport
+from my_private_finances.utils.money import money_from_db
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 

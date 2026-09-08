@@ -18,7 +18,6 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from sqlalchemy import select
 
-from my_private_finances.utils.money import money_from_db
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Account, Transaction
 from my_private_finances.schemas import (
@@ -27,6 +26,7 @@ from my_private_finances.schemas import (
     NetWorthPoint,
     NetWorthReport,
 )
+from my_private_finances.utils.money import money_from_db
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 

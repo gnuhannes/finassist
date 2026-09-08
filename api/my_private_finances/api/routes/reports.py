@@ -9,7 +9,6 @@ from fastapi.params import Query
 from sqlalchemy import case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from my_private_finances.utils.money import money_from_db
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import Account, Budget, Category, Transaction
 from my_private_finances.schemas import (
@@ -21,6 +20,7 @@ from my_private_finances.schemas import (
     PayeeTotal,
     TopSpending,
 )
+from my_private_finances.utils.money import money_from_db
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
