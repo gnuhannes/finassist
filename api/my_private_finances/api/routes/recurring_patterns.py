@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Annotated, Any, cast
+from typing import Annotated
 
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.params import Query
@@ -20,6 +20,7 @@ from my_private_finances.schemas import (
 from my_private_finances.services.recurring_detection import run_detection
 from my_private_finances.utils.db_helpers import get_account_or_404
 from my_private_finances.utils.money import money_from_db
+from my_private_finances.utils.sql import table
 
 router = APIRouter(prefix="/recurring-patterns", tags=["recurring-patterns"])
 
@@ -141,7 +142,7 @@ async def get_recurring_summary(
 ) -> RecurringSummary:
     await get_account_or_404(session, account_id)
 
-    rp = cast(Any, RecurringPattern).__table__
+    rp = table(RecurringPattern)
 
     stmt = (
         select(
