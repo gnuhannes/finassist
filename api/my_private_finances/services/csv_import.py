@@ -1,17 +1,35 @@
+"""CSV import (review finding C6 / issue #108).
+
+``import_transactions_from_csv_path`` used to be a ~275-line function doing
+account check + rule load + encoding detection + a ~180-line per-row loop +
+two-phase insert. It's now split:
+
+* :func:`detect_encoding` — bytes -> ``(text, encoding)``.
+* :func:`parse_row` — one CSV row -> ``ParsedRow`` | ``RowSkipped`` | ``RowFailed``.
+* :class:`RowAccumulator` — counters + bounded error list.
+* :func:`parse_csv` — pure, CPU-bound driver over ``parse_row``; runs in a
+  worker thread so a big import doesn't stall the event loop (finishes #103).
+* ``import_transactions_from_csv_path`` — async shell: DB reads/writes only.
+"""
+
+from __future__ import annotations
+
 import csv
 import hashlib
 import io
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, TypedDict
 
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from my_private_finances.models import Account, Transaction
+from my_private_finances.models import Account, CategorizationRule, Transaction
 from my_private_finances.schemas.import_result import ImportErrorDetail
 from my_private_finances.services.categorization import (
     load_rules_ordered,
@@ -23,6 +41,8 @@ from my_private_finances.services.transaction_hash import HashInput, compute_imp
 logger = logging.getLogger(__name__)
 
 IMPORT_SOURCE = "csv"
+
+_ENCODINGS = ("utf-8-sig", "cp1252")
 
 
 class ColumnMap(TypedDict, total=False):
@@ -50,6 +70,47 @@ DEFAULT_COLUMN_MAP: ColumnMap = {
     "notes": [],
 }
 
+_MISSING_COLUMN_HINT = (
+    "Add one of these header names to the CSV, or configure a column mapping "
+    "in your profile."
+)
+
+
+@dataclass(slots=True)
+class CsvConfig:
+    """Resolved import settings for one file (column map already merged)."""
+
+    column_map: ColumnMap
+    delimiter: str = ","
+    date_format: str = "iso"
+    decimal_comma: bool = False
+    row_filters: dict[str, list[str]] | None = None
+    row_exclude_filters: dict[str, list[str]] | None = None
+
+
+@dataclass(slots=True)
+class ParsedRow:
+    booking_date: date
+    amount: Decimal
+    currency: str
+    payee: str | None
+    purpose: str | None
+    notes: str | None
+    external_id: str
+
+
+@dataclass(slots=True)
+class RowSkipped:
+    """Row intentionally ignored (filter match, or empty amount cell)."""
+
+
+@dataclass(slots=True)
+class RowFailed:
+    error: ImportErrorDetail
+
+
+RowOutcome = ParsedRow | RowSkipped | RowFailed
+
 
 @dataclass(slots=True)
 class ImportResult:
@@ -60,6 +121,41 @@ class ImportResult:
     failed: int
     errors: list[ImportErrorDetail] = field(default_factory=list)
     errors_truncated: bool = False
+
+
+class RowAccumulator:
+    """Running counters + a bounded list of row errors for one import."""
+
+    def __init__(self, max_errors: int) -> None:
+        self.total_rows = 0
+        self.created = 0
+        self.skipped = 0
+        self.duplicates = 0
+        self.failed = 0
+        self.errors: list[ImportErrorDetail] = []
+        self._max_errors = max_errors
+
+    def record_error(self, err: ImportErrorDetail) -> None:
+        self.failed += 1
+        if len(self.errors) < self._max_errors:
+            self.errors.append(err)
+        logger.warning("Line %s: [%s] %s", err.row, err.field or "?", err.message)
+
+    def to_result(self) -> ImportResult:
+        return ImportResult(
+            total_rows=self.total_rows,
+            created=self.created,
+            skipped=self.skipped,
+            duplicates=self.duplicates,
+            failed=self.failed,
+            errors=self.errors,
+            errors_truncated=self.failed > len(self.errors),
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Pure value parsers
+# --------------------------------------------------------------------------- #
 
 
 def _normalize_currency(value: str) -> str:
@@ -96,10 +192,7 @@ def _parse_decimal(value: str, *, decimal_comma: bool) -> Decimal:
 
 
 def _row_fingerprint(row: dict[str, Any]) -> str:
-    """
-    Deterministic fallback external_id if none is provided.
-    Must be stable across re-imports of the same CSV content.
-    """
+    """Deterministic fallback external_id — stable across re-imports of the file."""
     parts = [
         str(row.get("booking_date", "")).strip(),
         str(row.get("amount", "")).strip(),
@@ -119,6 +212,214 @@ def _first_present(row: dict[str, Any], keys: list[str]) -> str | None:
     return None
 
 
+def _missing_column_error(row_num: int, field_name: str, keys: list[str]) -> RowFailed:
+    return RowFailed(
+        ImportErrorDetail(
+            row=row_num,
+            field=field_name,
+            message=f"Missing column '{'/'.join(keys)}'",
+            hint=_MISSING_COLUMN_HINT,
+        )
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Encoding + row parsing
+# --------------------------------------------------------------------------- #
+
+
+def detect_encoding(raw: bytes) -> tuple[str, str]:
+    """Decode CSV bytes — UTF-8 (BOM-aware) then cp1252. Returns ``(text, encoding)``."""
+    for enc in _ENCODINGS:
+        try:
+            return raw.decode(enc), enc
+        except UnicodeDecodeError:
+            continue
+    raise CsvFormatError(
+        f"Cannot decode CSV file — tried {', '.join(_ENCODINGS)}. "
+        "Please re-export with UTF-8 encoding."
+    )
+
+
+def _is_filtered_out(row: dict[str, str], cfg: CsvConfig) -> bool:
+    if cfg.row_filters and any(
+        row.get(col, "") not in vals for col, vals in cfg.row_filters.items()
+    ):
+        return True
+    if cfg.row_exclude_filters and any(
+        row.get(col, "") in vals for col, vals in cfg.row_exclude_filters.items()
+    ):
+        return True
+    return False
+
+
+def parse_row(row: dict[str, str], row_num: int, cfg: CsvConfig) -> RowOutcome:
+    """Turn one raw CSV row into a ``ParsedRow``, or a skip / failure marker."""
+    cmap = cfg.column_map
+
+    if _is_filtered_out(row, cfg):
+        return RowSkipped()
+
+    booking_date_raw = _first_present(row, cmap["booking_date"])
+    if booking_date_raw is None:
+        return _missing_column_error(row_num, "booking_date", cmap["booking_date"])
+    try:
+        booking_date = _parse_date(booking_date_raw, date_format=cfg.date_format)
+    except ValueError as e:
+        other_fmt = (
+            "DMY (dd.mm.yyyy)" if cfg.date_format == "iso" else "ISO (yyyy-mm-dd)"
+        )
+        return RowFailed(
+            ImportErrorDetail(
+                row=row_num,
+                field="booking_date",
+                raw_value=booking_date_raw,
+                message=str(e),
+                hint=f"Try switching the date format to {other_fmt}.",
+            )
+        )
+
+    amount_raw = _first_present(row, cmap["amount"])
+    if amount_raw is None:
+        if any(k in row for k in cmap["amount"]):
+            # Header present but the cell is empty — informational / pending row.
+            return RowSkipped()
+        return _missing_column_error(row_num, "amount", cmap["amount"])
+    try:
+        amount = _parse_decimal(amount_raw, decimal_comma=cfg.decimal_comma)
+    except ValueError as e:
+        decimal_hint = (
+            "Try enabling the 'Decimal comma' option (German format: 1.234,56)."
+            if not cfg.decimal_comma
+            else "Try disabling the 'Decimal comma' option (standard format: 1234.56)."
+        )
+        return RowFailed(
+            ImportErrorDetail(
+                row=row_num,
+                field="amount",
+                raw_value=amount_raw,
+                message=str(e),
+                hint=decimal_hint,
+            )
+        )
+
+    currency_raw = _first_present(row, cmap["currency"])
+    if currency_raw is None:
+        return _missing_column_error(row_num, "currency", cmap["currency"])
+
+    return ParsedRow(
+        booking_date=booking_date,
+        amount=amount,
+        currency=_normalize_currency(currency_raw),
+        payee=_first_present(row, cmap["payee"]),
+        purpose=_first_present(row, cmap["purpose"]),
+        notes=_first_present(row, cmap["notes"]),
+        external_id=_first_present(row, cmap["external_id"]) or _row_fingerprint(row),
+    )
+
+
+def _build_transaction(
+    parsed: ParsedRow,
+    account_id: int,
+    rules: Sequence[CategorizationRule],
+) -> Transaction:
+    import_hash = compute_import_hash(
+        HashInput(
+            account_id=account_id,
+            booking_date=parsed.booking_date,
+            amount=parsed.amount,
+            currency=parsed.currency,
+            payee=parsed.payee,
+            purpose=parsed.purpose,
+            external_id=parsed.external_id,
+            import_source=IMPORT_SOURCE,
+        )
+    )
+    tx = Transaction(
+        account_id=account_id,
+        booking_date=parsed.booking_date,
+        amount=parsed.amount,
+        currency=parsed.currency,
+        payee=parsed.payee,
+        purpose=parsed.purpose,
+        notes=parsed.notes,
+        category_id=None,
+        external_id=parsed.external_id,
+        import_source=IMPORT_SOURCE,
+        import_hash=import_hash,
+    )
+    if rules:
+        matched_cat = match_transaction(tx, list(rules))
+        if matched_cat is not None:
+            tx.category_id = matched_cat
+    return tx
+
+
+# --------------------------------------------------------------------------- #
+# Sync driver (worker thread) + async shell
+# --------------------------------------------------------------------------- #
+
+
+def parse_csv(
+    text: str,
+    cfg: CsvConfig,
+    *,
+    account_id: int,
+    rules: Sequence[CategorizationRule],
+    max_rows: int,
+    max_errors: int,
+) -> tuple[list[Transaction], RowAccumulator]:
+    """CPU-bound: parse every row and build the transient ``Transaction`` list.
+
+    De-duplicates within the file; DB-level de-dup happens back on the loop.
+    Runs in a worker thread — must not touch the ``AsyncSession``.
+    """
+    acc = RowAccumulator(max_errors)
+    pending: list[Transaction] = []
+    seen_hashes: set[str] = set()
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=cfg.delimiter)
+    if reader.fieldnames is None:
+        raise CsvFormatError("CSV has no header row")
+
+    for row_num, row in enumerate(reader, start=2):
+        acc.total_rows += 1
+        if acc.total_rows > max_rows:
+            raise CsvFormatError(
+                f"CSV exceeds the {max_rows:,}-row import limit; "
+                "split the file and import in parts"
+            )
+
+        outcome = parse_row(row, row_num, cfg)
+        if isinstance(outcome, RowSkipped):
+            acc.skipped += 1
+            continue
+        if isinstance(outcome, RowFailed):
+            acc.record_error(outcome.error)
+            continue
+
+        try:
+            tx = _build_transaction(outcome, account_id, rules)
+        except Exception as e:  # pragma: no cover - compute_import_hash is total
+            acc.record_error(
+                ImportErrorDetail(
+                    row=row_num,
+                    message=f"Failed to compute import hash: {e}",
+                    unexpected=True,
+                )
+            )
+            continue
+
+        if tx.import_hash in seen_hashes:
+            acc.duplicates += 1
+            logger.debug("Row %d: within-file duplicate, skipped", row_num)
+            continue
+        seen_hashes.add(tx.import_hash)
+        pending.append(tx)
+
+    return pending, acc
+
+
 async def import_transactions_from_csv_path(
     *,
     session: AsyncSession,
@@ -133,234 +434,39 @@ async def import_transactions_from_csv_path(
     row_filters: dict[str, list[str]] | None = None,
     row_exclude_filters: dict[str, list[str]] | None = None,
 ) -> ImportResult:
-    col: ColumnMap = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     res = await session.execute(select(Account).where(Account.id == account_id))  # type: ignore[arg-type]
     if res.scalar_one_or_none() is None:
         raise NotFoundError(f"Account {account_id} not found")
 
     rules = await load_rules_ordered(session)
+    cfg = CsvConfig(
+        column_map={**DEFAULT_COLUMN_MAP, **(column_map or {})},
+        delimiter=delimiter,
+        date_format=date_format,
+        decimal_comma=decimal_comma,
+        row_filters=row_filters,
+        row_exclude_filters=row_exclude_filters,
+    )
+
+    text, encoding = detect_encoding(csv_path.read_bytes())
     logger.info(
-        "CSV import started: account_id=%d, file=%s, rules=%d",
+        "CSV import started: account_id=%d, file=%s, rules=%d, encoding=%s",
         account_id,
         csv_path.name,
         len(rules),
+        encoding,
     )
 
-    total_rows = 0
-    created = 0
-    skipped = 0
-    duplicates = 0
-    failed = 0
-    all_errors: list[ImportErrorDetail] = []
+    pending, acc = await run_in_threadpool(
+        parse_csv,
+        text,
+        cfg,
+        account_id=account_id,
+        rules=rules,
+        max_rows=max_rows,
+        max_errors=max_errors,
+    )
 
-    _ENCODINGS = ("utf-8-sig", "cp1252")
-    raw = csv_path.read_bytes()
-    text: str | None = None
-    used_encoding: str | None = None
-    for enc in _ENCODINGS:
-        try:
-            text = raw.decode(enc)
-            used_encoding = enc
-            break
-        except UnicodeDecodeError:
-            continue
-    if text is None:
-        raise CsvFormatError(
-            f"Cannot decode CSV file — tried {', '.join(_ENCODINGS)}. "
-            "Please re-export with UTF-8 encoding."
-        )
-    logger.debug("CSV encoding detected: %s", used_encoding)
-
-    # Phase 1: parse all rows into Transaction objects; count parse errors
-    pending: list[Transaction] = []
-    seen_hashes: set[str] = set()
-
-    def _record_error(err: ImportErrorDetail) -> None:
-        if len(all_errors) < max_errors:
-            all_errors.append(err)
-        logger.warning(
-            "Line %s: [%s] %s",
-            err.row,
-            err.field or "?",
-            err.message,
-        )
-
-    with io.StringIO(text) as f:
-        reader = csv.DictReader(f, delimiter=delimiter)
-        if reader.fieldnames is None:
-            raise CsvFormatError("CSV has no header row")
-
-        for idx, row in enumerate(reader, start=2):
-            total_rows += 1
-            if total_rows > max_rows:
-                raise CsvFormatError(
-                    f"CSV exceeds the {max_rows:,}-row import limit; "
-                    "split the file and import in parts"
-                )
-
-            if row_filters and any(
-                row.get(col, "") not in vals for col, vals in row_filters.items()
-            ):
-                skipped += 1
-                continue
-            if row_exclude_filters and any(
-                row.get(col, "") in vals for col, vals in row_exclude_filters.items()
-            ):
-                skipped += 1
-                continue
-
-            row_failed = False
-
-            # --- booking_date ---
-            booking_date_raw = _first_present(row, col["booking_date"])
-            if booking_date_raw is None:
-                candidates = "/".join(col["booking_date"])
-                _record_error(
-                    ImportErrorDetail(
-                        row=idx,
-                        field="booking_date",
-                        message=f"Missing column '{candidates}'",
-                        hint="Add one of these header names to the CSV, or configure a column mapping in your profile.",
-                    )
-                )
-                failed += 1
-                continue
-            try:
-                booking_date = _parse_date(booking_date_raw, date_format=date_format)
-            except ValueError as e:
-                other_fmt = (
-                    "DMY (dd.mm.yyyy)" if date_format == "iso" else "ISO (yyyy-mm-dd)"
-                )
-                _record_error(
-                    ImportErrorDetail(
-                        row=idx,
-                        field="booking_date",
-                        raw_value=booking_date_raw,
-                        message=str(e),
-                        hint=f"Try switching the date format to {other_fmt}.",
-                    )
-                )
-                failed += 1
-                row_failed = True
-
-            if row_failed:
-                continue
-
-            # --- amount ---
-            amount_raw = _first_present(row, col["amount"])
-            if amount_raw is None:
-                col_in_header = any(k in row for k in col["amount"])
-                if col_in_header:
-                    # Column header present but cell is empty — informational/pending row, skip silently.
-                    skipped += 1
-                else:
-                    candidates = "/".join(col["amount"])
-                    _record_error(
-                        ImportErrorDetail(
-                            row=idx,
-                            field="amount",
-                            message=f"Missing column '{candidates}'",
-                            hint="Add one of these header names to the CSV, or configure a column mapping in your profile.",
-                        )
-                    )
-                    failed += 1
-                continue
-            try:
-                amount = _parse_decimal(amount_raw, decimal_comma=decimal_comma)
-            except ValueError as e:
-                decimal_hint = (
-                    "Try enabling the 'Decimal comma' option (German format: 1.234,56)."
-                    if not decimal_comma
-                    else "Try disabling the 'Decimal comma' option (standard format: 1234.56)."
-                )
-                _record_error(
-                    ImportErrorDetail(
-                        row=idx,
-                        field="amount",
-                        raw_value=amount_raw,
-                        message=str(e),
-                        hint=decimal_hint,
-                    )
-                )
-                failed += 1
-                continue
-
-            # --- currency ---
-            currency_raw = _first_present(row, col["currency"])
-            if currency_raw is None:
-                candidates = "/".join(col["currency"])
-                _record_error(
-                    ImportErrorDetail(
-                        row=idx,
-                        field="currency",
-                        message=f"Missing column '{candidates}'",
-                        hint="Add one of these header names to the CSV, or configure a column mapping in your profile.",
-                    )
-                )
-                failed += 1
-                continue
-            currency = _normalize_currency(currency_raw)
-
-            payee = _first_present(row, col["payee"])
-            purpose = _first_present(row, col["purpose"])
-            notes = _first_present(row, col["notes"])
-
-            external_id = _first_present(row, col["external_id"])
-            if external_id is None:
-                external_id = _row_fingerprint(row)
-
-            try:
-                import_hash = compute_import_hash(
-                    HashInput(
-                        account_id=account_id,
-                        booking_date=booking_date,
-                        amount=amount,
-                        currency=currency,
-                        payee=payee,
-                        purpose=purpose,
-                        external_id=external_id,
-                        import_source=IMPORT_SOURCE,
-                    )
-                )
-            except Exception as e:
-                _record_error(
-                    ImportErrorDetail(
-                        row=idx,
-                        message=f"Failed to compute import hash: {e}",
-                        unexpected=True,
-                    )
-                )
-                failed += 1
-                continue
-
-            if import_hash in seen_hashes:
-                duplicates += 1
-                logger.debug("Row %d: within-file duplicate, skipped", idx)
-                continue
-            seen_hashes.add(import_hash)
-
-            db_obj = Transaction(
-                account_id=account_id,
-                booking_date=booking_date,
-                amount=amount,
-                currency=currency,
-                payee=payee,
-                purpose=purpose,
-                notes=notes,
-                category_id=None,
-                external_id=external_id,
-                import_source=IMPORT_SOURCE,
-                import_hash=import_hash,
-            )
-
-            if rules:
-                matched_cat = match_transaction(db_obj, rules)
-                if matched_cat is not None:
-                    db_obj.category_id = matched_cat
-
-            pending.append(db_obj)
-
-    # Phase 2: filter out rows already in DB, then batch-insert the rest
     if pending:
         pending_hashes = {tx.import_hash for tx in pending}
         existing_result = await session.execute(
@@ -370,7 +476,7 @@ async def import_transactions_from_csv_path(
             )
         )
         existing_hashes = {row[0] for row in existing_result}
-        duplicates += len(existing_hashes)
+        acc.duplicates += len(existing_hashes)
 
         new_transactions = [
             tx for tx in pending if tx.import_hash not in existing_hashes
@@ -378,25 +484,16 @@ async def import_transactions_from_csv_path(
         if new_transactions:
             session.add_all(new_transactions)
             await session.commit()
-        created = len(new_transactions)
+        acc.created = len(new_transactions)
 
     logger.info(
-        "CSV import complete: account_id=%d, total=%d, created=%d, skipped=%d, duplicates=%d, failed=%d",
+        "CSV import complete: account_id=%d, total=%d, created=%d, skipped=%d, "
+        "duplicates=%d, failed=%d",
         account_id,
-        total_rows,
-        created,
-        skipped,
-        duplicates,
-        failed,
+        acc.total_rows,
+        acc.created,
+        acc.skipped,
+        acc.duplicates,
+        acc.failed,
     )
-
-    errors_truncated = failed > len(all_errors)
-    return ImportResult(
-        total_rows=total_rows,
-        created=created,
-        skipped=skipped,
-        duplicates=duplicates,
-        failed=failed,
-        errors=all_errors,
-        errors_truncated=errors_truncated,
-    )
+    return acc.to_result()
