@@ -121,6 +121,7 @@ async def import_transactions_from_csv_path(
     account_id: int,
     csv_path: Path,
     max_errors: int = 50,
+    max_rows: int = 100_000,
     delimiter: str = ",",
     date_format: str = "iso",
     decimal_comma: bool = False,
@@ -187,6 +188,11 @@ async def import_transactions_from_csv_path(
 
         for idx, row in enumerate(reader, start=2):
             total_rows += 1
+            if total_rows > max_rows:
+                raise ValueError(
+                    f"CSV exceeds the {max_rows:,}-row import limit; "
+                    "split the file and import in parts"
+                )
 
             if row_filters and any(
                 row.get(col, "") not in vals for col, vals in row_filters.items()
