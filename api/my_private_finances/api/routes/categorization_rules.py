@@ -19,20 +19,10 @@ from my_private_finances.services.categorization import apply_rules_to_uncategor
 router = APIRouter(prefix="/categorization-rules", tags=["categorization-rules"])
 
 
-def _to_read(rule: CategorizationRule) -> RuleRead:
-    assert rule.id is not None
-    return RuleRead(
-        id=rule.id,
-        position=rule.position,
-        field=rule.field,
-        operator=rule.operator,
-        value=rule.value,
-        category_id=rule.category_id,
-    )
-
-
 @router.post("", response_model=RuleRead, status_code=201)
-async def create_rule(payload: Annotated[RuleCreate, Body()], session: SessionDep):
+async def create_rule(
+    payload: Annotated[RuleCreate, Body()], session: SessionDep
+) -> CategorizationRule:
     # Validate category exists
     cat = await session.get(Category, payload.category_id)
     if cat is None:
@@ -55,15 +45,15 @@ async def create_rule(payload: Annotated[RuleCreate, Body()], session: SessionDe
     session.add(db_obj)
     await session.commit()
     await session.refresh(db_obj)
-    return _to_read(db_obj)
+    return db_obj
 
 
 @router.get("", response_model=list[RuleRead])
-async def list_rules(session: SessionDep):
+async def list_rules(session: SessionDep) -> list[CategorizationRule]:
     result = await session.execute(
         select(CategorizationRule).order_by(CategorizationRule.position)  # type: ignore[arg-type]
     )
-    return [_to_read(r) for r in result.scalars().all()]
+    return list(result.scalars().all())
 
 
 @router.patch("/{rule_id}", response_model=RuleRead)
@@ -71,7 +61,7 @@ async def update_rule(
     rule_id: int,
     payload: Annotated[RuleUpdate, Body()],
     session: SessionDep,
-):
+) -> CategorizationRule:
     db_obj = await session.get(CategorizationRule, rule_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -90,11 +80,11 @@ async def update_rule(
 
     await session.commit()
     await session.refresh(db_obj)
-    return _to_read(db_obj)
+    return db_obj
 
 
 @router.delete("/{rule_id}", status_code=204)
-async def delete_rule(rule_id: int, session: SessionDep):
+async def delete_rule(rule_id: int, session: SessionDep) -> None:
     db_obj = await session.get(CategorizationRule, rule_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -104,7 +94,9 @@ async def delete_rule(rule_id: int, session: SessionDep):
 
 
 @router.put("/reorder", response_model=list[RuleRead])
-async def reorder_rules(payload: Annotated[RuleReorder, Body()], session: SessionDep):
+async def reorder_rules(
+    payload: Annotated[RuleReorder, Body()], session: SessionDep
+) -> list[CategorizationRule]:
     # Load all rules
     result = await session.execute(select(CategorizationRule))
     rules_by_id = {r.id: r for r in result.scalars().all()}
@@ -126,11 +118,10 @@ async def reorder_rules(payload: Annotated[RuleReorder, Body()], session: Sessio
     await session.commit()
 
     # Return in new order
-    ordered = sorted(rules_by_id.values(), key=lambda r: r.position)
-    return [_to_read(r) for r in ordered]
+    return sorted(rules_by_id.values(), key=lambda r: r.position)
 
 
 @router.post("/apply", response_model=ApplyResult)
-async def apply_rules(session: SessionDep):
+async def apply_rules(session: SessionDep) -> ApplyResult:
     categorized = await apply_rules_to_uncategorized(session)
     return ApplyResult(categorized=categorized)

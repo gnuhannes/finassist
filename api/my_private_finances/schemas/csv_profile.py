@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # Valid field names that can be remapped via column_map
 REMAPPABLE_FIELDS = frozenset(
@@ -23,6 +23,8 @@ class CsvProfileCreate(BaseModel):
 
 class CsvProfileRead(CsvProfileCreate):
     id: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CsvProfileUpdate(BaseModel):

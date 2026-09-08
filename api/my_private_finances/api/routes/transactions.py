@@ -73,20 +73,7 @@ async def create_transaction(
     if db_obj.id is None:
         raise HTTPException(status_code=500, detail="Transaction ID not assigned")
 
-    return TransactionRead(
-        id=db_obj.id,
-        account_id=db_obj.account_id,
-        booking_date=db_obj.booking_date,
-        amount=db_obj.amount,
-        currency=db_obj.currency,
-        payee=db_obj.payee,
-        purpose=db_obj.purpose,
-        category_id=db_obj.category_id,
-        external_id=db_obj.external_id,
-        import_source=db_obj.import_source,
-        import_hash=db_obj.import_hash,
-        is_transfer=db_obj.is_transfer,
-    )
+    return TransactionRead.model_validate(db_obj)
 
 
 @router.patch("/{transaction_id}", response_model=TransactionRead)
@@ -110,21 +97,7 @@ async def update_transaction(
     await session.commit()
     await session.refresh(db_obj)
 
-    assert db_obj.id is not None
-    return TransactionRead(
-        id=db_obj.id,
-        account_id=db_obj.account_id,
-        booking_date=db_obj.booking_date,
-        amount=db_obj.amount,
-        currency=db_obj.currency,
-        payee=db_obj.payee,
-        purpose=db_obj.purpose,
-        category_id=db_obj.category_id,
-        external_id=db_obj.external_id,
-        import_source=db_obj.import_source,
-        import_hash=db_obj.import_hash,
-        is_transfer=db_obj.is_transfer,
-    )
+    return TransactionRead.model_validate(db_obj)
 
 
 @router.get("", response_model=TransactionListResponse)
@@ -184,27 +157,6 @@ async def list_transactions(
     )
 
     res = await session.execute(stmt)
-    rows = list(res.scalars().all())
-
-    items: list[TransactionRead] = []
-    for row in rows:
-        if row.id is None:
-            continue
-        items.append(
-            TransactionRead(
-                id=row.id,
-                account_id=row.account_id,
-                booking_date=row.booking_date,
-                amount=row.amount,
-                currency=row.currency,
-                payee=row.payee,
-                purpose=row.purpose,
-                category_id=row.category_id,
-                external_id=row.external_id,
-                import_source=row.import_source,
-                import_hash=row.import_hash,
-                is_transfer=row.is_transfer,
-            )
-        )
+    items = [TransactionRead.model_validate(row) for row in res.scalars().all()]
 
     return TransactionListResponse(items=items, total=total)

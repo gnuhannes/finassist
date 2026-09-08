@@ -13,17 +13,10 @@ from my_private_finances.schemas import CategoryCreate, CategoryRead, CategoryUp
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
-def _to_read(cat: Category) -> CategoryRead:
-    assert cat.id is not None
-    return CategoryRead(
-        id=cat.id, name=cat.name, parent_id=cat.parent_id, cost_type=cat.cost_type
-    )
-
-
 @router.post("", response_model=CategoryRead, status_code=201)
 async def create_category(
     category: Annotated[CategoryCreate, Body()], session: SessionDep
-):
+) -> Category:
     if category.parent_id is not None:
         parent = await session.get(Category, category.parent_id)
         if parent is None:
@@ -37,13 +30,13 @@ async def create_category(
     session.add(db_obj)
     await session.commit()
     await session.refresh(db_obj)
-    return _to_read(db_obj)
+    return db_obj
 
 
 @router.get("", response_model=list[CategoryRead])
-async def list_categories(session: SessionDep):
+async def list_categories(session: SessionDep) -> list[Category]:
     res = await session.execute(select(Category).order_by(Category.name))  # type: ignore[arg-type]
-    return [_to_read(c) for c in res.scalars().all()]
+    return list(res.scalars().all())
 
 
 @router.patch("/{category_id}", response_model=CategoryRead)
@@ -51,7 +44,7 @@ async def update_category(
     category_id: int,
     payload: Annotated[CategoryUpdate, Body()],
     session: SessionDep,
-):
+) -> Category:
     db_obj = await session.get(Category, category_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -74,11 +67,11 @@ async def update_category(
 
     await session.commit()
     await session.refresh(db_obj)
-    return _to_read(db_obj)
+    return db_obj
 
 
 @router.delete("/{category_id}", status_code=204)
-async def delete_category(category_id: int, session: SessionDep):
+async def delete_category(category_id: int, session: SessionDep) -> None:
     db_obj = await session.get(Category, category_id)
     if db_obj is None:
         raise HTTPException(status_code=404, detail="Category not found")

@@ -2,10 +2,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, field_serializer
+from pydantic import field_serializer
+
+from my_private_finances.schemas.base import ReadSchema
 
 
-class TransactionRead(BaseModel):
+class TransactionRead(ReadSchema):
     id: int
     account_id: int
     booking_date: date
