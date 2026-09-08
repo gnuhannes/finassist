@@ -11,7 +11,7 @@ from my_private_finances.models.mixins import TimestampMixin
 
 
 class TransactionBase(SQLModel):
-    account_id: int = Field(foreign_key="account.id", index=True)
+    account_id: int = Field(foreign_key="account.id", ondelete="RESTRICT", index=True)
 
     booking_date: date = Field(sa_column=Column(Date, nullable=False, index=True))
 
@@ -22,7 +22,9 @@ class TransactionBase(SQLModel):
     purpose: Optional[str] = Field(default=None, sa_column=Column(Text))
     notes: Optional[str] = Field(default=None, sa_column=Column(Text))
 
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id")
+    category_id: Optional[int] = Field(
+        default=None, foreign_key="category.id", ondelete="SET NULL"
+    )
 
     external_id: Optional[str] = Field(default=None, sa_column=Column(String(128)))
     import_source: Optional[str] = Field(default=None, sa_column=Column(String(64)))

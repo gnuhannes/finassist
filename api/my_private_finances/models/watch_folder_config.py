@@ -17,5 +17,7 @@ class WatchFolderConfig(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     subfolder_name: str = Field(unique=True)
-    account_id: int = Field(foreign_key="account.id")
-    profile_id: Optional[int] = Field(default=None, foreign_key="csv_profile.id")
+    account_id: int = Field(foreign_key="account.id", ondelete="CASCADE")
+    profile_id: Optional[int] = Field(
+        default=None, foreign_key="csv_profile.id", ondelete="SET NULL"
+    )

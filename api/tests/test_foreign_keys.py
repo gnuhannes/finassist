@@ -42,21 +42,51 @@ async def test_create_transaction_with_unknown_category_returns_422(
 
 
 @pytest.mark.asyncio
-async def test_delete_category_referenced_by_budget_returns_409(
-    test_app: AsyncClient,
-) -> None:
+async def test_delete_category_cascades_its_budget(test_app: AsyncClient) -> None:
+    """category -> budget FK is ON DELETE CASCADE (#117)."""
     cat = await create_category(test_app, name="Rent")
     await create_budget(test_app, category_id=cat["id"], amount="900.00")
 
     res = await test_app.delete(f"/api/categories/{cat['id']}")
-    assert res.status_code == 409
+    assert res.status_code == 204
 
-    # The category and its budget are both still there.
-    assert len((await test_app.get("/api/categories")).json()) == 1
+    assert (await test_app.get("/api/categories")).json() == []
+    assert (
+        await test_app.get("/api/reports/budget-vs-actual", params={"month": "2026-01"})
+    ).json() == []
 
 
 @pytest.mark.asyncio
-async def test_delete_csv_profile_in_use_returns_409(test_app: AsyncClient) -> None:
+async def test_delete_category_in_use_by_transactions_still_409(
+    test_app: AsyncClient,
+) -> None:
+    """Transactions are the one reference the route refuses to touch implicitly."""
+    account = await create_account(test_app)
+    cat = await create_category(test_app, name="Food")
+    tx = await test_app.post(
+        "/api/transactions",
+        json={
+            "account_id": account["id"],
+            "booking_date": "2026-02-01",
+            "amount": "-5.00",
+            "currency": "EUR",
+            "payee": "REWE",
+            "purpose": "x",
+            "import_source": "manual",
+            "external_id": "fk-cat-1",
+            "category_id": cat["id"],
+        },
+    )
+    assert tx.status_code == 201, tx.text
+    res = await test_app.delete(f"/api/categories/{cat['id']}")
+    assert res.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_delete_csv_profile_in_use_nulls_the_config(
+    test_app: AsyncClient,
+) -> None:
+    """watch_folder_config.profile_id is ON DELETE SET NULL (#117)."""
     account = await create_account(test_app)
     profile = (await test_app.post("/api/csv-profiles", json={"name": "Bank X"})).json()
     cfg = await test_app.post(
@@ -70,4 +100,7 @@ async def test_delete_csv_profile_in_use_returns_409(test_app: AsyncClient) -> N
     assert cfg.status_code == 201, cfg.text
 
     res = await test_app.delete(f"/api/csv-profiles/{profile['id']}")
-    assert res.status_code == 409
+    assert res.status_code == 204
+
+    configs = (await test_app.get("/api/watch-folder/configs")).json()
+    assert configs[0]["profile_id"] is None

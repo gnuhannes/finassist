@@ -142,10 +142,16 @@ async def _count(session: SessionDep, model: type) -> int:
 )
 async def delete_transactions(session: SessionDep) -> dict:
     """Delete all transactions, transfer candidates, and recurring patterns."""
-    models = [TransferCandidate, RecurringPattern, Transaction]
-    deleted = sum([await _count(session, m) for m in models])
-    for model in models:
-        await session.execute(delete(model))
+    deleted = sum(
+        [
+            await _count(session, m)
+            for m in (TransferCandidate, RecurringPattern, Transaction)
+        ]
+    )
+    # transfer_candidate.*_transaction_id is ON DELETE CASCADE (#117), so
+    # deleting the transactions clears the candidates too.
+    await session.execute(delete(RecurringPattern))
+    await session.execute(delete(Transaction))
     await session.commit()
     logger.info("Deleted all transactions: %d rows total", deleted)
     return {"deleted": deleted}
