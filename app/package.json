@@ -15,7 +15,8 @@
     "e2e:report": "playwright show-report",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test:coverage": "vitest run --coverage -c vitest.config.ts"
+    "test:coverage": "vitest run --coverage -c vitest.config.ts",
+    "gen:api": "openapi-typescript ../api/openapi.json -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
@@ -24,8 +25,7 @@
     "react-dom": "^19.2.8",
     "react-i18next": "^17.0.13",
     "react-router-dom": "^7.18.3",
-    "recharts": "^3.10.1",
-    "zod": "^4.5.4"
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -44,6 +44,7 @@
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
     "jsdom": "^30.0.1",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.6",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.70.0",

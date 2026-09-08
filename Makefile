@@ -19,8 +19,20 @@ help:
 	@echo "  make sync          - Install deps (backend + frontend)"
 
 .PHONY: ci
-ci: ci-backend ci-frontend
+ci: ci-backend ci-frontend check-openapi
 	@echo "✅ Full CI suite passed"
+
+# Regenerate the FE/BE contract: api/openapi.json + app/src/lib/api/schema.d.ts
+.PHONY: openapi
+openapi:
+	cd api && poetry run python scripts/export_openapi.py
+	cd app && pnpm run -s gen:api
+
+# Fail if the committed contract is stale (CI).
+.PHONY: check-openapi
+check-openapi: openapi
+	git diff --exit-code -- api/openapi.json app/src/lib/api/schema.d.ts \
+		|| { echo "openapi.json / schema.d.ts are out of date — run 'make openapi'"; exit 1; }
 
 .PHONY: ci-backend
 ci-backend:
