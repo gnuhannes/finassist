@@ -17,6 +17,7 @@ from my_private_finances.services.categorization import (
     load_rules_ordered,
     match_transaction,
 )
+from my_private_finances.services.exceptions import CsvFormatError, NotFoundError
 from my_private_finances.services.transaction_hash import HashInput, compute_import_hash
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ async def import_transactions_from_csv_path(
     col: ColumnMap = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     res = await session.execute(select(Account).where(Account.id == account_id))  # type: ignore[arg-type]
     if res.scalar_one_or_none() is None:
-        raise ValueError(f"Account {account_id} not found")
+        raise NotFoundError(f"Account {account_id} not found")
 
     rules = await load_rules_ordered(session)
     logger.info(
@@ -164,7 +165,7 @@ async def import_transactions_from_csv_path(
         except UnicodeDecodeError:
             continue
     if text is None:
-        raise ValueError(
+        raise CsvFormatError(
             f"Cannot decode CSV file — tried {', '.join(_ENCODINGS)}. "
             "Please re-export with UTF-8 encoding."
         )
@@ -187,12 +188,12 @@ async def import_transactions_from_csv_path(
     with io.StringIO(text) as f:
         reader = csv.DictReader(f, delimiter=delimiter)
         if reader.fieldnames is None:
-            raise ValueError("CSV has no header row")
+            raise CsvFormatError("CSV has no header row")
 
         for idx, row in enumerate(reader, start=2):
             total_rows += 1
             if total_rows > max_rows:
-                raise ValueError(
+                raise CsvFormatError(
                     f"CSV exceeds the {max_rows:,}-row import limit; "
                     "split the file and import in parts"
                 )

@@ -16,14 +16,18 @@ from sqlmodel import select
 from my_private_finances.config import get_settings
 from my_private_finances.models import Category, Transaction
 from my_private_finances.schemas.ml import Suggestion, TrainResult
+from my_private_finances.services.exceptions import ServiceError
 
 logger = logging.getLogger(__name__)
 
 MIN_SAMPLES = 10
 
 
-class ColdStartError(Exception):
-    """Raised when there are not enough categorized transactions to train."""
+class ColdStartError(ServiceError):
+    """Not enough categorized transactions to train / no model trained yet."""
+
+    status_code = 400
+    default_detail = "Not enough categorized transactions to train a model"
 
 
 def _model_path() -> Path:
