@@ -13,6 +13,7 @@ from my_private_finances.api.routes.data_management import (
     router as data_management_router,
 )
 from my_private_finances.api.routes.export import router as export_router
+from my_private_finances.api.routes.health import router as health_router
 from my_private_finances.api.routes.imports import router as imports_router
 from my_private_finances.api.routes.ml import router as ml_router
 from my_private_finances.api.routes.net_worth import router as net_worth_router
@@ -42,3 +43,4 @@ api_router.include_router(export_router)
 api_router.include_router(data_management_router)
 api_router.include_router(ml_router)
 api_router.include_router(watch_folder_router)
+api_router.include_router(health_router)

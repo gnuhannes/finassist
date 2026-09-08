@@ -36,7 +36,13 @@ async def test_app() -> AsyncGenerator[AsyncClient, None]:
                 await conn.run_sync(SQLModel.metadata.create_all)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # The SPA's fetch wrapper always sends X-Requested-With; mirror that so
+        # the destructive-endpoint guard (#99) is transparent to normal tests.
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ) as client:
             yield client
 
         await engine.dispose()

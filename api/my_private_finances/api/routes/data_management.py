@@ -13,7 +13,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import delete, func, select
 
 from my_private_finances.db import sqlite_path_from_engine
-from my_private_finances.deps import SessionDep
+from my_private_finances.deps import RequireConfirmation, SessionDep
 from my_private_finances.models import (
     Account,
     Budget,
@@ -98,7 +98,7 @@ def _sqlite_copy(src_path: str, dst_path: str) -> None:
         src.close()
 
 
-@router.post("/restore/sqlite", status_code=200)
+@router.post("/restore/sqlite", status_code=200, dependencies=[RequireConfirmation])
 async def restore_sqlite(file: UploadFile, request: Request) -> dict:
     data = await file.read()
     if len(data) > _MAX_RESTORE_BYTES:
@@ -137,7 +137,9 @@ async def _count(session: SessionDep, model: type) -> int:
     return int(result.scalar_one())
 
 
-@router.delete("/data/transactions", status_code=200)
+@router.delete(
+    "/data/transactions", status_code=200, dependencies=[RequireConfirmation]
+)
 async def delete_transactions(session: SessionDep) -> dict:
     """Delete all transactions, transfer candidates, and recurring patterns."""
     models = [TransferCandidate, RecurringPattern, Transaction]
@@ -149,7 +151,7 @@ async def delete_transactions(session: SessionDep) -> dict:
     return {"deleted": deleted}
 
 
-@router.delete("/data", status_code=200)
+@router.delete("/data", status_code=200, dependencies=[RequireConfirmation])
 async def wipe_all_data(session: SessionDep) -> dict:
     """Delete all data from all tables in FK-safe order."""
     models = [
