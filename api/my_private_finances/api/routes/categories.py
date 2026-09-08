@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Body, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from my_private_finances.deps import SessionDep
@@ -93,4 +94,17 @@ async def delete_category(category_id: int, session: SessionDep):
         )
 
     await session.delete(db_obj)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as e:
+        # Foreign keys are enforced (PRAGMA foreign_keys=ON): the category is
+        # still referenced by a budget, categorization rule, sub-category, or
+        # recurring pattern.
+        await session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Category is still referenced (budget, rule, sub-category, or "
+                "recurring pattern) and cannot be deleted"
+            ),
+        ) from e
