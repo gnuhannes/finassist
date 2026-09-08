@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, Response
 from sqlmodel import select
 from starlette.background import BackgroundTask
 
+from my_private_finances.db import sqlite_path_from_engine
 from my_private_finances.deps import SessionDep
 from my_private_finances.models import (
     Account,
@@ -41,7 +42,7 @@ def _serialize(obj: Any) -> Any:
 
 @router.get("/sqlite")
 async def export_sqlite(request: Request) -> FileResponse:
-    db_path = request.app.state.db_path
+    db_path = sqlite_path_from_engine(request.app.state.engine)
     tmp = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
     tmp.close()
 

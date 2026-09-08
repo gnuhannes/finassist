@@ -1,9 +1,65 @@
 from __future__ import annotations
 
+import os
+import sqlite3
+import tempfile
+from pathlib import Path
+
 import pytest
 from httpx import AsyncClient
 
 from tests.helpers import create_account, create_category, create_transaction
+
+
+def _sqlite_bytes(*, core_tables: bool, alembic_revision: str | None) -> bytes:
+    """A syntactically valid SQLite file with tunable contents."""
+    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as f:
+        path = f.name
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE placeholder (id INTEGER)")
+    if core_tables:
+        conn.execute("CREATE TABLE account (id INTEGER)")
+        conn.execute('CREATE TABLE "transaction" (id INTEGER)')
+        conn.execute("CREATE TABLE category (id INTEGER)")
+    if alembic_revision is not None:
+        conn.execute("CREATE TABLE alembic_version (version_num VARCHAR(32))")
+        conn.execute("INSERT INTO alembic_version VALUES (?)", (alembic_revision,))
+    conn.commit()
+    conn.close()
+    data = Path(path).read_bytes()
+    os.unlink(path)
+    return data
+
+
+@pytest.mark.asyncio
+async def test_restore_rejects_sqlite_missing_core_tables(
+    test_app: AsyncClient,
+) -> None:
+    body = _sqlite_bytes(core_tables=False, alembic_revision=None)
+    resp = await test_app.post(
+        "/api/restore/sqlite", files={"file": ("x.sqlite", body, "x")}
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_restore_rejects_unknown_schema_revision(test_app: AsyncClient) -> None:
+    body = _sqlite_bytes(core_tables=True, alembic_revision="zzz999notreal")
+    resp = await test_app.post(
+        "/api/restore/sqlite", files={"file": ("x.sqlite", body, "x")}
+    )
+    assert resp.status_code == 400
+    assert "revision" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_restore_rejects_corrupt_file(test_app: AsyncClient) -> None:
+    corrupt = b"SQLite format 3\x00" + b"\x00" * 400
+    resp = await test_app.post(
+        "/api/restore/sqlite",
+        files={"file": ("x.sqlite", corrupt, "x")},
+    )
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio
