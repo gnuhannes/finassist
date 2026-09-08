@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import delete, func, select
 
 from my_private_finances.db import sqlite_path_from_engine
@@ -87,6 +88,16 @@ def _validate_restore_candidate(path: str) -> None:
         conn.close()
 
 
+def _sqlite_copy(src_path: str, dst_path: str) -> None:
+    src = sqlite3.connect(src_path)
+    dst = sqlite3.connect(dst_path)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+
+
 @router.post("/restore/sqlite", status_code=200)
 async def restore_sqlite(file: UploadFile, request: Request) -> dict:
     data = await file.read()
@@ -112,13 +123,7 @@ async def restore_sqlite(file: UploadFile, request: Request) -> dict:
             # Release all pooled async connections before writing
             await request.app.state.engine.dispose()
 
-            src = sqlite3.connect(tmp_path)
-            dst = sqlite3.connect(dst_path)
-            try:
-                src.backup(dst)
-            finally:
-                dst.close()
-                src.close()
+            await run_in_threadpool(_sqlite_copy, tmp_path, dst_path)
         finally:
             if tmp_path is not None:
                 os.unlink(tmp_path)
